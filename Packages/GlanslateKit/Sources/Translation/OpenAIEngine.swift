@@ -75,11 +75,9 @@ public struct OpenAIEngine: TranslationEngine {
             "text": [
                 "format": [
                     "type": "json_schema",
-                    "json_schema": [
-                        "name": "TranslatedBlocks",
-                        "schema": schema,
-                        "strict": true,
-                    ],
+                    "name": "TranslatedBlocks",
+                    "schema": schema,
+                    "strict": true,
                 ],
             ],
         ]

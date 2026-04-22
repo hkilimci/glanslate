@@ -32,7 +32,7 @@ public struct GoogleEngine: TranslationEngine {
             throw GlanslateError.missingAPIKey(.google)
         }
         var results: [Translation] = []
-        for batch in blocks.chunked(into: 1024) {
+        for batch in blocks.chunked(into: 128) {
             try Task.checkCancellation()
             let url = URL(string: "https://language.googleapis.com/language/translate/v2?key=\(key)")!
             var req = URLRequest(url: url)
@@ -48,8 +48,11 @@ public struct GoogleEngine: TranslationEngine {
                 throw GlanslateError.translation(provider: .google, reason: "HTTP \(resp.statusCode)")
             }
             struct GoogleResponse: Decodable {
-                struct T: Decodable { let translatedText: String }
-                let translations: [T]
+                struct DataPayload: Decodable {
+                    struct T: Decodable { let translatedText: String }
+                    let translations: [T]
+                }
+                let data: DataPayload
             }
             let decoded: GoogleResponse
             do {
@@ -57,10 +60,10 @@ public struct GoogleEngine: TranslationEngine {
             } catch {
                 throw GlanslateError.translation(provider: .google, reason: "Decode failed")
             }
-            guard decoded.translations.count == batch.count else {
+            guard decoded.data.translations.count == batch.count else {
                 throw GlanslateError.translation(provider: .google, reason: "Mismatched batch count")
             }
-            for (i, t) in decoded.translations.enumerated() {
+            for (i, t) in decoded.data.translations.enumerated() {
                 results.append(Translation(
                     block: batch[i],
                     translatedText: t.translatedText,
