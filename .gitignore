@@ -1,6 +1,10 @@
 # IDE
 .idea/
 .vscode/
+.build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
 *.swp
 *.swo
 *~

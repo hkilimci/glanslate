@@ -1,0 +1,359 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2C07D9905655EF27934256FC /* MenuBarExtraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56329A2BDC48B3FCE2AF5BBF /* MenuBarExtraView.swift */; };
+		71E37523F0BB38C5C77C66F7 /* GlanslateKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4B5C21AB02CA94EBA2207939 /* GlanslateKit */; };
+		DCCF63B32BC58A6013EDF6D1 /* SettingsSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9969193025C41AA841065E5 /* SettingsSceneView.swift */; };
+		F04304E0C6192B0CCCAE1555 /* GlanslateApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1172B96A481ED32A1C04AA3 /* GlanslateApp.swift */; };
+		F8D1FA0F82CCBFD05449EA7E /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3EF5737A3C99E1CC8CF873B /* AppRoot.swift */; };
+		99ABCDEF1234567890FEDCBA /* OnboardingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1234567890ABCDEF00FEDCBA /* OnboardingWindow.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		56329A2BDC48B3FCE2AF5BBF /* MenuBarExtraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarExtraView.swift; sourceTree = "<group>"; };
+		7196C90C6552A927D6FC5A85 /* Glanslate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Glanslate.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		75B1CDCE77ECD7F18E4EB309 /* GlanslateKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GlanslateKit; path = Packages/GlanslateKit; sourceTree = SOURCE_ROOT; };
+		A9969193025C41AA841065E5 /* SettingsSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSceneView.swift; sourceTree = "<group>"; };
+		C3EF5737A3C99E1CC8CF873B /* AppRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoot.swift; sourceTree = "<group>"; };
+		DD15C7B67AB5D80C4D12052B /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		F1172B96A481ED32A1C04AA3 /* GlanslateApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanslateApp.swift; sourceTree = "<group>"; };
+		1234567890ABCDEF00FEDCBA /* OnboardingWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindow.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		ED1415656BD02A664C8F2600 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				71E37523F0BB38C5C77C66F7 /* GlanslateKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4F145F57FD44533931F6AD5A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7196C90C6552A927D6FC5A85 /* Glanslate.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		713A1E9DBD8EB2D55CC3FECB = {
+			isa = PBXGroup;
+			children = (
+				E41F34B5109FEA9576D494AD /* App */,
+				856844C24E53AEFE2BBBD7C3 /* Configs */,
+				72756C7644FAF88FCB117C59 /* Packages */,
+				4F145F57FD44533931F6AD5A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		72756C7644FAF88FCB117C59 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				75B1CDCE77ECD7F18E4EB309 /* GlanslateKit */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		856844C24E53AEFE2BBBD7C3 /* Configs */ = {
+			isa = PBXGroup;
+			children = (
+				DD15C7B67AB5D80C4D12052B /* Base.xcconfig */,
+			);
+			path = Configs;
+			sourceTree = "<group>";
+		};
+		E41F34B5109FEA9576D494AD /* App */ = {
+			isa = PBXGroup;
+			children = (
+				C3EF5737A3C99E1CC8CF873B /* AppRoot.swift */,
+				F1172B96A481ED32A1C04AA3 /* GlanslateApp.swift */,
+				56329A2BDC48B3FCE2AF5BBF /* MenuBarExtraView.swift */,
+				1234567890ABCDEF00FEDCBA /* OnboardingWindow.swift */,
+				A9969193025C41AA841065E5 /* SettingsSceneView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C30475ACCA472752F915FF04 /* Glanslate */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4E19D6334A3AA0BB509FD9A5 /* Build configuration list for PBXNativeTarget "Glanslate" */;
+			buildPhases = (
+				E52E6AE8310A0C97E8324F17 /* Sources */,
+				ED1415656BD02A664C8F2600 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Glanslate;
+			packageProductDependencies = (
+				4B5C21AB02CA94EBA2207939 /* GlanslateKit */,
+			);
+			productName = Glanslate;
+			productReference = 7196C90C6552A927D6FC5A85 /* Glanslate.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		46E053AFDDDAE771AA829841 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					C30475ACCA472752F915FF04 = {
+						DevelopmentTeam = "$(GLANSLATE_DEVELOPMENT_TEAM)";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 5F49FDBF47AD59E9BA6B1237 /* Build configuration list for PBXProject "Glanslate" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 713A1E9DBD8EB2D55CC3FECB;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4DB64ADE1360684EC46D1A4B /* XCLocalSwiftPackageReference "Packages/GlanslateKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C30475ACCA472752F915FF04 /* Glanslate */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E52E6AE8310A0C97E8324F17 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F8D1FA0F82CCBFD05449EA7E /* AppRoot.swift in Sources */,
+				F04304E0C6192B0CCCAE1555 /* GlanslateApp.swift in Sources */,
+				2C07D9905655EF27934256FC /* MenuBarExtraView.swift in Sources */,
+				99ABCDEF1234567890FEDCBA /* OnboardingWindow.swift in Sources */,
+				DCCF63B32BC58A6013EDF6D1 /* SettingsSceneView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		25DCC7E43287D5435F5F0118 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		42E2DBC8D166AA2251F5DCB2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DD15C7B67AB5D80C4D12052B /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Glanslate.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_NAME = Glanslate;
+				SDKROOT = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		46A88A247ED537C50EB2EE68 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DD15C7B67AB5D80C4D12052B /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Glanslate.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_NAME = Glanslate;
+				SDKROOT = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
+		E22F688D930E74CA05444547 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4E19D6334A3AA0BB509FD9A5 /* Build configuration list for PBXNativeTarget "Glanslate" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				42E2DBC8D166AA2251F5DCB2 /* Debug */,
+				46A88A247ED537C50EB2EE68 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5F49FDBF47AD59E9BA6B1237 /* Build configuration list for PBXProject "Glanslate" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25DCC7E43287D5435F5F0118 /* Debug */,
+				E22F688D930E74CA05444547 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4DB64ADE1360684EC46D1A4B /* XCLocalSwiftPackageReference "Packages/GlanslateKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/GlanslateKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4B5C21AB02CA94EBA2207939 /* GlanslateKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GlanslateKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 46E053AFDDDAE771AA829841 /* Project object */;
+}
