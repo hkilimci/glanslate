@@ -20,21 +20,33 @@ public struct AppleLanguageAvailability: LanguageAvailabilityProviding {
     public func availability(from: Language?, to: Language) async -> AvailabilityStatus {
         #if canImport(Translation)
         if #available(macOS 26.0, *) {
-            let targetLang = Locale.Language(identifier: to.bcp47)
-            let sourceLang = Locale.Language(identifier: from?.bcp47 ?? "auto")
-            let status = await appleAvailability.status(from: sourceLang, to: targetLang)
-            let caseName = String(describing: status)
-            if caseName == "installed" {
+            if from == nil {
                 return .supported
-            } else if caseName == "notInstalled" {
-                return .needsDownload
-            } else {
-                return .unsupported
             }
+            let targetLang = Locale.Language(identifier: to.bcp47)
+            let sourceLang = Locale.Language(identifier: from!.bcp47)
+            let status = await appleAvailability.status(from: sourceLang, to: targetLang)
+            return Self.map(status)
         }
         #endif
         return .unsupported
     }
+
+    #if canImport(Translation)
+    @available(macOS 26.0, *)
+    static func map(_ status: LanguageAvailability.Status) -> AvailabilityStatus {
+        switch status {
+        case .installed:
+            return .supported
+        case .supported:
+            return .needsDownload
+        case .unsupported:
+            return .unsupported
+        @unknown default:
+            return .unsupported
+        }
+    }
+    #endif
 }
 
 public struct AppleTranslationEngine: TranslationEngine {
@@ -61,29 +73,18 @@ public struct AppleTranslationEngine: TranslationEngine {
                 throw GlanslateError.unsupportedPair(.apple, from: from, to: to)
             }
 
-            let targetLang = Locale.Language(identifier: to.bcp47)
-            let sourceLang = Locale.Language(identifier: from?.bcp47 ?? "auto")
-
-            let session = try await TranslationSession(
-                installedSource: sourceLang,
-                target: targetLang
-            )
-
-            var results: [Translation] = []
-            results.reserveCapacity(blocks.count)
-
-            for block in blocks {
-                let response = try await session.translate(block.text)
-                let translated = extractText(from: response)
-                results.append(Translation(
-                    block: block,
-                    translatedText: translated,
-                    targetLanguage: to,
-                    provider: .apple
-                ))
+            do {
+                return try await AppleTranslationSessionBridge.shared.translate(
+                    blocks,
+                    from: from,
+                    to: to,
+                    needsDownload: status == .needsDownload
+                )
+            } catch let error as GlanslateError {
+                throw error
+            } catch {
+                throw mapTranslationError(error, from: from, to: to)
             }
-
-            return results
         }
         #endif
         throw GlanslateError.translation(provider: .apple, reason: "Apple Translation unavailable on this OS.")
@@ -91,8 +92,25 @@ public struct AppleTranslationEngine: TranslationEngine {
 
     #if canImport(Translation)
     @available(macOS 26.0, *)
-    private func extractText(from response: TranslationSession.Response) -> String {
-        response.targetText
+    private func mapTranslationError(
+        _ error: any Error,
+        from: Language?,
+        to: Language
+    ) -> GlanslateError {
+        if TranslationError.unsupportedLanguagePairing ~= error ||
+            TranslationError.unsupportedSourceLanguage ~= error ||
+            TranslationError.unsupportedTargetLanguage ~= error {
+            return .unsupportedPair(.apple, from: from, to: to)
+        }
+
+        if TranslationError.notInstalled ~= error {
+            return .translation(
+                provider: .apple,
+                reason: "Language models are not installed. Allow the download prompt and retry."
+            )
+        }
+
+        return .translation(provider: .apple, reason: error.localizedDescription)
     }
     #endif
 }

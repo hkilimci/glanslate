@@ -105,6 +105,15 @@ private struct TranslationSettingsTab: View {
                 }
             }
 
+            Section("Apple On-Device Languages") {
+                if #available(macOS 26.0, *) {
+                    AppleLanguagesView()
+                } else {
+                    Text("Requires macOS 26.0 or later.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Cloud Disclosure") {
                 ForEach(TranslationProvider.allCases.filter(\.sendsTextOffDevice), id: \.self) { provider in
                     if settings.hasAcceptedDisclosure(for: provider) {
@@ -319,5 +328,94 @@ private struct AboutSettingsTab: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(24)
+    }
+}
+
+@available(macOS 26.0, *)
+@MainActor
+private struct AppleLanguagesView: View {
+    @State private var manager = AppleLanguageManager()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Manage language models for Apple Translation.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(action: {
+                    Task { await manager.refresh() }
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(manager.isLoading)
+            }
+
+            if manager.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
+            } else if manager.items.isEmpty {
+                Text("No languages found.")
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 8)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(manager.items) { item in
+                            LanguageRow(item: item) {
+                                Task { await manager.download(language: item.language) }
+                            }
+                            Divider()
+                        }
+                    }
+                }
+                .frame(height: 200)
+
+                HStack {
+                    Spacer()
+                    Button("Download All Missing") {
+                        Task { await manager.downloadAll() }
+                    }
+                    .disabled(manager.items.allSatisfy { $0.status != .supported })
+                }
+            }
+        }
+        .task {
+            await manager.refresh()
+        }
+    }
+}
+
+@available(macOS 26.0, *)
+@MainActor
+private struct LanguageRow: View {
+    let item: AppleLanguageManager.Item
+    let onDownload: () -> Void
+
+    var body: some View {
+        HStack {
+            Text(Locale.current.localizedString(forLanguageCode: item.language.languageCode?.identifier ?? "") ?? item.language.languageCode?.identifier ?? "Unknown")
+            Spacer()
+            switch item.status {
+            case .installed:
+                Label("Installed", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.caption)
+            case .supported:
+                Button("Download", action: onDownload)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            case .unsupported:
+                Text("Unsupported")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            @unknown default:
+                Text("Unknown")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
