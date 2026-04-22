@@ -23,7 +23,6 @@ public struct SCKScreenCapturer: ScreenCapturing {
         guard PermissionProbe.screenRecordingGranted() else {
             throw GlanslateError.permissionDenied(.screenRecording)
         }
-        // Let the HUD window leave the window list.
         try? await Task.sleep(nanoseconds: settleDelayNanoseconds)
 
         let content: SCShareableContent

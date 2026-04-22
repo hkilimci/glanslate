@@ -83,6 +83,7 @@ public actor OverlayEngine: OverlayPresenting {
     public func dismissAll() async {
         let active = sessions
         sessions.removeAll()
+        lastDisplayID = nil
         await MainActor.run {
             for session in active.values {
                 session.dismiss()
@@ -96,13 +97,12 @@ public actor OverlayEngine: OverlayPresenting {
 
     private func dismissSession(id: UUID) async {
         guard let session = sessions.removeValue(forKey: id) else { return }
+        lastDisplayID = nil
         await MainActor.run {
             session.dismiss()
         }
     }
 }
-
-public typealias MinimalOverlayPresenter = OverlayEngine
 
 @MainActor
 @Observable

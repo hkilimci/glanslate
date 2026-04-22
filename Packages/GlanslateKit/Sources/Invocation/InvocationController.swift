@@ -357,9 +357,9 @@ final class AsyncStreamBroadcaster<Element: Sendable>: @unchecked Sendable {
             lock.lock()
             continuations[id] = continuation
             let latestValue = latest
+            continuation.yield(latestValue)
             lock.unlock()
 
-            continuation.yield(latestValue)
             continuation.onTermination = { [weak self] _ in
                 self?.removeContinuation(id)
             }

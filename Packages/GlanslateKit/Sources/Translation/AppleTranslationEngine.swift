@@ -22,8 +22,8 @@ public struct AppleLanguageAvailability: LanguageAvailabilityProviding {
         if #available(macOS 26.0, *) {
             let targetLang = Locale.Language(identifier: to.bcp47)
             let sourceLang = Locale.Language(identifier: from?.bcp47 ?? "auto")
-            let avail = await appleAvailability.status(from: sourceLang, to: targetLang)
-            let caseName = String(describing: avail)
+            let status = await appleAvailability.status(from: sourceLang, to: targetLang)
+            let caseName = String(describing: status)
             if caseName == "installed" {
                 return .supported
             } else if caseName == "notInstalled" {
@@ -92,13 +92,7 @@ public struct AppleTranslationEngine: TranslationEngine {
     #if canImport(Translation)
     @available(macOS 26.0, *)
     private func extractText(from response: TranslationSession.Response) -> String {
-        let mirror = Mirror(reflecting: response)
-        for child in mirror.children {
-            if let text = child.value as? String, !text.isEmpty {
-                return text
-            }
-        }
-        return ""
+        response.targetText
     }
     #endif
 }

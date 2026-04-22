@@ -5,6 +5,19 @@ import SwiftData
 import SwiftUI
 import GlanslateKit
 
+private func persistedBinding<Value>(
+    settings: SettingsStore,
+    _ keyPath: ReferenceWritableKeyPath<SettingsStore, Value>
+) -> Binding<Value> {
+    Binding(
+        get: { settings[keyPath: keyPath] },
+        set: {
+            settings[keyPath: keyPath] = $0
+            settings.persist()
+        }
+    )
+}
+
 struct SettingsSceneView: View {
     let appRoot: AppRoot
 
@@ -71,13 +84,13 @@ private struct TranslationSettingsTab: View {
     var body: some View {
         Form {
             Section("Providers") {
-                Picker("Preferred Provider", selection: persistedBinding(\.preferredProvider)) {
+                Picker("Preferred Provider", selection: persistedBinding(settings: settings, \.preferredProvider)) {
                     ForEach(TranslationProvider.allCases, id: \.self) { provider in
                         Text(provider.displayName).tag(provider)
                     }
                 }
 
-                Picker("Fallback Provider", selection: persistedBinding(\.fallbackProvider)) {
+                Picker("Fallback Provider", selection: persistedBinding(settings: settings, \.fallbackProvider)) {
                     ForEach(TranslationProvider.allCases, id: \.self) { provider in
                         Text(provider.displayName).tag(provider)
                     }
@@ -85,7 +98,7 @@ private struct TranslationSettingsTab: View {
             }
 
             Section("Language") {
-                Picker("Default Target", selection: persistedBinding(\.defaultTargetLanguage)) {
+                Picker("Default Target", selection: persistedBinding(settings: settings, \.defaultTargetLanguage)) {
                     ForEach(Language.allCases.filter { $0 != .auto }, id: \.self) { language in
                         Text(language.displayName).tag(language)
                     }
@@ -112,18 +125,6 @@ private struct TranslationSettingsTab: View {
         .formStyle(.grouped)
         .padding(20)
     }
-
-    private func persistedBinding<Value>(
-        _ keyPath: ReferenceWritableKeyPath<SettingsStore, Value>
-    ) -> Binding<Value> {
-        Binding(
-            get: { settings[keyPath: keyPath] },
-            set: {
-                settings[keyPath: keyPath] = $0
-                settings.persist()
-            }
-        )
-    }
 }
 
 private struct OverlaySettingsTab: View {
@@ -132,7 +133,7 @@ private struct OverlaySettingsTab: View {
     var body: some View {
         Form {
             Section("Style") {
-                Picker("Default Style", selection: persistedBinding(\.overlayStyle)) {
+                Picker("Default Style", selection: persistedBinding(settings: settings, \.overlayStyle)) {
                     ForEach(OverlayStyle.allCases, id: \.self) { style in
                         Text(style.displayName).tag(style)
                     }
@@ -151,7 +152,7 @@ private struct OverlaySettingsTab: View {
                     Text("Opacity")
                 }
 
-                Picker("Peek Modifier", selection: persistedBinding(\.peekModifier)) {
+                Picker("Peek Modifier", selection: persistedBinding(settings: settings, \.peekModifier)) {
                     ForEach(PeekModifier.allCases, id: \.self) { modifier in
                         Text(modifier.displayName).tag(modifier)
                     }
@@ -159,33 +160,21 @@ private struct OverlaySettingsTab: View {
             }
 
             Section("Subtitle") {
-                Toggle("Show Hairline Border", isOn: persistedBinding(\.subtitleShowBorder))
+                Toggle("Show Hairline Border", isOn: persistedBinding(settings: settings, \.subtitleShowBorder))
 
                 TextField(
                     "Text Color (#RRGGBB)",
-                    text: persistedBinding(\.subtitleTextColorHex)
+                    text: persistedBinding(settings: settings, \.subtitleTextColorHex)
                 )
 
                 TextField(
                     "Outline Color (#RRGGBB)",
-                    text: persistedBinding(\.subtitleOutlineColorHex)
+                    text: persistedBinding(settings: settings, \.subtitleOutlineColorHex)
                 )
             }
         }
         .formStyle(.grouped)
         .padding(20)
-    }
-
-    private func persistedBinding<Value>(
-        _ keyPath: ReferenceWritableKeyPath<SettingsStore, Value>
-    ) -> Binding<Value> {
-        Binding(
-            get: { settings[keyPath: keyPath] },
-            set: {
-                settings[keyPath: keyPath] = $0
-                settings.persist()
-            }
-        )
     }
 }
 

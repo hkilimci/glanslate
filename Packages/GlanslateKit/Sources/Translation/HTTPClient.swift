@@ -22,7 +22,7 @@ public struct HTTPClient: Sendable {
         while true {
             try Task.checkCancellation()
             var req = request
-            if req.timeoutInterval == 60 { req.timeoutInterval = timeout }
+            req.timeoutInterval = timeout
             let result: (Data, URLResponse)
             do {
                 result = try await session.data(for: req)

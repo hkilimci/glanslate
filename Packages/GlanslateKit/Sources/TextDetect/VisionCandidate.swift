@@ -166,29 +166,5 @@ public extension Language {
         }
     }
 
-    var nlLanguage: NLLanguage? {
-        switch self {
-        case .auto: return nil
-        case .en: return .english
-        case .tr: return .turkish
-        case .es: return .spanish
-        case .fr: return .french
-        case .de: return .german
-        case .it: return .italian
-        case .pt: return .portuguese
-        case .ru: return .russian
-        case .ja: return .japanese
-        case .ko: return .korean
-        case .zhHans: return .simplifiedChinese
-        case .zhHant: return .traditionalChinese
-        case .ar: return .arabic
-        case .hi: return .hindi
-        case .pl: return .polish
-        case .nl: return .dutch
-        case .sv: return .swedish
-        case .cs: return .czech
-        case .uk: return .ukrainian
-        case .he: return .hebrew
-        }
-    }
+
 }

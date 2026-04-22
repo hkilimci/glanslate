@@ -81,7 +81,7 @@ public actor TranslationRouter: TranslationRouting {
     private func dominantLanguage(from blocks: [TextBlock]) -> Language? {
         var counts: [Language: Double] = [:]
         for b in blocks {
-            guard let lang = b.detectedLanguage else { return nil }
+            guard let lang = b.detectedLanguage else { continue }
             counts[lang, default: 0] += max(0.5, b.confidence)
         }
         let sum = counts.values.reduce(0, +)

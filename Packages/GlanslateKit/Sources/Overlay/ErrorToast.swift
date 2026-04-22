@@ -39,24 +39,6 @@ public final class ErrorToastPresenter: ErrorToasting {
             }
         }
     }
-
-    private func positionOnDisplay(_ window: NSWindow, displayID: CGDirectDisplayID) {
-        guard let screen = NSScreen.screens.first(where: { screen in
-            guard let deviceDescription = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
-                return false
-            }
-            return deviceDescription == displayID
-        }) else {
-            window.center()
-            return
-        }
-
-        let screenFrame = screen.visibleFrame
-        let windowFrame = window.frame
-        let x = screenFrame.midX - windowFrame.width / 2
-        let y = screenFrame.midY - windowFrame.height / 2
-        window.setFrameOrigin(NSPoint(x: x, y: y))
-    }
 }
 
 @MainActor
@@ -94,12 +76,7 @@ private final class ToastWindow: NSWindow {
     }
 
     private func positionOnDisplay(displayID: CGDirectDisplayID) {
-        guard let screen = NSScreen.screens.first(where: { screen in
-            guard let deviceDescription = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
-                return false
-            }
-            return deviceDescription == displayID
-        }) else {
+        guard let screen = NSScreen.screens.first(where: { $0.displayID == displayID }) else {
             center()
             return
         }

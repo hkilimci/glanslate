@@ -34,10 +34,6 @@ public final class SettingsStore {
     public var subtitleTextColorHex: String          // #RRGGBB
     public var subtitleOutlineColorHex: String
 
-    // Onboarding
-    public var didShowOnboarding: Bool
-
-    // Non-persisted: keychain for keys.
     public let keychain: KeychainStore
 
     private let defaults: UserDefaults
@@ -50,14 +46,13 @@ public final class SettingsStore {
         self.defaultTargetLanguage = defaults.decode("defaultTargetLanguage", default: .en)
         self.acceptedCloudDisclosureProviders =
             Set(defaults.decode("acceptedCloudDisclosureProviders", default: Array<TranslationProvider>()))
-        self.openAIModel = defaults.string(forKey: "openAIModel") ?? "gpt-5.4-mini"
+        self.openAIModel = defaults.string(forKey: "openAIModel") ?? "gpt-4o-mini"
         self.overlayStyle = defaults.decode("overlayStyle", default: .cleanPatch)
         self.overlayOpacity = defaults.object(forKey: "overlayOpacity") as? Double ?? 1.0
         self.peekModifier = defaults.decode("peekModifier", default: .option)
         self.subtitleShowBorder = defaults.object(forKey: "subtitleShowBorder") as? Bool ?? false
         self.subtitleTextColorHex = defaults.string(forKey: "subtitleTextColorHex") ?? "#FFFFFF"
         self.subtitleOutlineColorHex = defaults.string(forKey: "subtitleOutlineColorHex") ?? "#000000"
-        self.didShowOnboarding = defaults.bool(forKey: "didShowOnboarding")
     }
 
     public func persist() {
@@ -72,7 +67,6 @@ public final class SettingsStore {
         defaults.set(subtitleShowBorder, forKey: "subtitleShowBorder")
         defaults.set(subtitleTextColorHex, forKey: "subtitleTextColorHex")
         defaults.set(subtitleOutlineColorHex, forKey: "subtitleOutlineColorHex")
-        defaults.set(didShowOnboarding, forKey: "didShowOnboarding")
     }
 
     public func acceptDisclosure(for provider: TranslationProvider) {

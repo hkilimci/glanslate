@@ -118,3 +118,13 @@ Legend: **[dead]** unused symbol, **[redundant]** duplicated / replaceable logic
 3. Fix **18–22** before shipping OpenAI / Google / Apple paths — current state means only Apple Translation (via the Mirror hack) and DeepL are realistically working.
 4. Refactor **13, 15, 16, 17** while touching the affected files.
 5. Address **23–28** opportunistically during the next pass on each subsystem.
+
+2) Addition (
+Startup crash riski (try!)
+SwiftDataHistoryStore() başarısız olursa fallback’te try! SwiftDataHistoryStore(inMemory: true) var; ikinci init de fail ederse app hard-crash olur. Graceful error path yok.
+
+Onboarding presenter tekrar çağrılırsa çoklu pencere riski (koruma zayıf)
+checkAndShow() içinde isPresented/windowController != nil guard’ı yok; aynı oturumda tekrar çağrılırsa yeni controller üretme ihtimali var (çağrı modeli bugün tek sefer olabilir ama API kendisi idempotent değil).
+
+NSScreenNumber dönüşümünde iki farklı yaklaşımın birlikte yaşaması
+DisplayTopology tarafı NSNumber.uint32Value ile güvenli yaklaşım kullanırken ErrorToast tarafında doğrudan as? CGDirectDisplayID cast’i kullanılmış; teknik borç/fragility artıyor.

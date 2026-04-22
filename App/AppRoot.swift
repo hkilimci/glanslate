@@ -25,7 +25,7 @@ final class AppRoot {
         self.overlayPresenter = overlayPresenter
 
         let keychain = settingsStore.keychain
-            let router = TranslationRouter(
+        let router = TranslationRouter(
             engines: [
                 .apple: AppleTranslationEngine.create(),
                 .deepL: DeepLEngine(keychain: keychain),

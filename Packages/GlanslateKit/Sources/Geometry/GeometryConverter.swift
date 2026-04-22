@@ -73,14 +73,5 @@ public struct GeometryConverter: Sendable {
         )
     }
 
-    /// Convert display-local points rect to pixel rect (multiplies by backingScale of that display).
-    public func pixelRect(forDisplayLocal r: DisplayLocalRect) -> CGRect {
-        let scale = snapshot.entry(for: r.displayID)?.backingScale ?? 1.0
-        return CGRect(
-            x: r.rect.minX * scale,
-            y: r.rect.minY * scale,
-            width: r.rect.width * scale,
-            height: r.rect.height * scale
-        )
-    }
+
 }

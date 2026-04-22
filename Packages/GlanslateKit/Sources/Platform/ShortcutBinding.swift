@@ -14,8 +14,4 @@ public struct ShortcutBinding {
     public static func onTriggerTranslate(_ handler: @escaping @Sendable () -> Void) {
         KeyboardShortcuts.onKeyDown(for: .translateRegion, action: handler)
     }
-
-    public static func removeAllHandlers() {
-        KeyboardShortcuts.removeAllHandlers()
-    }
 }

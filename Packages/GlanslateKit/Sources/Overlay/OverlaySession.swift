@@ -119,12 +119,6 @@ public actor OverlaySessionHandle {
         continuation.yield(.pinned(payload))
     }
 
-    public func retranslate(to language: Language) async {
-        await requestRetranslation(
-            OverlayRetranslationRequest(targetLanguage: language)
-        )
-    }
-
     public func requestRetranslation(_ request: OverlayRetranslationRequest) async {
         guard !isDismissed else { return }
         await onRetranslateRequested(request)
