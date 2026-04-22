@@ -285,6 +285,7 @@ final class SelectionHUDWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
+        isReleasedWhenClosed = false
         level = .screenSaver - 1
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         isOpaque = false

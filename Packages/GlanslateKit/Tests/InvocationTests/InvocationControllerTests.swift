@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import XCTest
 @testable import GlanslateCapture
 @testable import GlanslateCore
@@ -17,6 +18,25 @@ private struct StubTopology: DisplayTopologyProviding {
 
     func current() -> DisplayTopologySnapshot {
         snapshot
+    }
+}
+
+private final class RefreshingTopology: @unchecked Sendable, DisplayTopologyProviding {
+    private let snapshots: [DisplayTopologySnapshot]
+    private let lock = NSLock()
+    private var nextIndex = 0
+
+    init(snapshots: [DisplayTopologySnapshot]) {
+        self.snapshots = snapshots
+    }
+
+    func current() -> DisplayTopologySnapshot {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let index = min(nextIndex, snapshots.count - 1)
+        nextIndex += 1
+        return snapshots[index]
     }
 }
 
@@ -213,6 +233,61 @@ final class InvocationControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testHappyPathIgnoresFreshTopologyTimestampWhenArrangementMatches() async throws {
+        let snapshots = [
+            sampleTopology(capturedAt: Date(timeIntervalSince1970: 1)),
+            sampleTopology(capturedAt: Date(timeIntervalSince1970: 2)),
+            sampleTopology(capturedAt: Date(timeIntervalSince1970: 3)),
+            sampleTopology(capturedAt: Date(timeIntervalSince1970: 4)),
+        ]
+        let selection = RegionSelection(region: sampleBlocks()[0].region, topology: snapshots[0])
+        let overlay = NoopOverlayPresenter()
+        let controller = InvocationController(
+            topology: RefreshingTopology(snapshots: snapshots),
+            regionSelect: StubRegionSelector(selection: selection),
+            capture: StubCapture(source: sampleSource()),
+            detect: StubDetector(blocks: sampleBlocks()),
+            translate: StubTranslator(translations: sampleTranslations()),
+            overlay: overlay,
+            history: try SwiftDataHistoryStore(inMemory: true),
+            settings: SettingsStore(
+                defaults: UserDefaults(suiteName: "InvocationFreshTimestamp-\(UUID().uuidString)")!,
+                keychain: KeychainStore(service: "InvocationFreshTimestamp-\(UUID().uuidString)")
+            )
+        )
+
+        let stream = controller.state
+        let valuesTask = Task<[InvocationState], Never> {
+            var values: [InvocationState] = []
+            for await value in stream {
+                values.append(value)
+                if case .presenting = value {
+                    break
+                }
+                if case .errored = value {
+                    break
+                }
+            }
+            return values
+        }
+
+        await Task.yield()
+        await controller.start()
+        let values: [InvocationState] = await valuesTask.value
+
+        XCTAssertTrue(values.contains(where: {
+            if case InvocationState.presenting = $0 { return true }
+            return false
+        }))
+        XCTAssertFalse(values.contains(where: {
+            if case .errored(.displayTopologyChanged) = $0 { return true }
+            return false
+        }))
+
+        await overlay.dismissAll()
+    }
+
+    @MainActor
     func testPinnedOverlayPersistsHistoryEntries() async throws {
         let overlay = RecordingOverlayPresenter()
         let history = try SwiftDataHistoryStore(inMemory: true)
@@ -283,7 +358,7 @@ final class InvocationControllerTests: XCTestCase {
         await overlay.dismissAll()
     }
 
-    private func sampleTopology() -> DisplayTopologySnapshot {
+    private func sampleTopology(capturedAt: Date = Date()) -> DisplayTopologySnapshot {
         DisplayTopologySnapshot(entries: [
             DisplayTopologyEntry(
                 displayID: 1,
@@ -292,7 +367,7 @@ final class InvocationControllerTests: XCTestCase {
                 pixelSize: CGSize(width: 200, height: 200),
                 isMain: true
             )
-        ])
+        ], capturedAt: capturedAt)
     }
 
     private func sampleSource() -> SourceVisualContext {

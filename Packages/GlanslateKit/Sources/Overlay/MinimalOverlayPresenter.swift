@@ -398,6 +398,7 @@ final class ManagedOverlayWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
+        isReleasedWhenClosed = false
         level = .statusBar
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         isOpaque = false
@@ -420,6 +421,7 @@ final class ManagedToolbarWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
+        isReleasedWhenClosed = false
         level = .statusBar
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         isOpaque = false

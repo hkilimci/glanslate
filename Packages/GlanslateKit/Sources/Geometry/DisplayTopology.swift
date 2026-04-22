@@ -36,6 +36,12 @@ public struct DisplayTopologySnapshot: Hashable, Sendable {
         self.capturedAt = capturedAt
     }
 
+    /// Compare only the display arrangement. `capturedAt` is metadata and
+    /// should not invalidate an in-flight invocation by itself.
+    public func hasSameArrangement(as other: DisplayTopologySnapshot) -> Bool {
+        entries == other.entries
+    }
+
     public var mainEntry: DisplayTopologyEntry? {
         entries.first(where: { $0.isMain }) ?? entries.first
     }

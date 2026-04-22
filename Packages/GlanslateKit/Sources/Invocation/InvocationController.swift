@@ -305,7 +305,7 @@ public actor InvocationController {
         guard currentInvocationID == invocationID else {
             throw CancellationError()
         }
-        guard topology.current() == snapshot else {
+        guard topology.current().hasSameArrangement(as: snapshot) else {
             throw GlanslateError.displayTopologyChanged
         }
     }

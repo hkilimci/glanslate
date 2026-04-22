@@ -43,7 +43,7 @@ struct SettingsSceneView: View {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
 
-            AboutSettingsTab()
+            AboutSettingsTab(appRoot: appRoot)
                 .tabItem {
                     Label("About", systemImage: "info.circle")
                 }
@@ -283,6 +283,8 @@ private struct HistoryCard: View {
 }
 
 private struct AboutSettingsTab: View {
+    let appRoot: AppRoot
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Glanslate")
@@ -293,6 +295,25 @@ private struct AboutSettingsTab: View {
 
             LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Dev")
             LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Local")
+
+            Divider()
+
+            Toggle("Show Dock Icon", isOn: Binding(
+                get: { appRoot.settingsStore.showDockIcon },
+                set: {
+                    appRoot.settingsStore.showDockIcon = $0
+                    appRoot.settingsStore.persist()
+                    appRoot.updateDockIconVisibility()
+                }
+            ))
+
+            if !PermissionProbe.screenRecordingGranted() || !PermissionProbe.accessibilityGranted() {
+                Divider()
+                Button("Fix Permissions") {
+                    PermissionProbe.openPane(.screenRecording)
+                }
+                .buttonStyle(.borderedProminent)
+            }
 
             Spacer()
         }

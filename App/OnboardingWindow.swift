@@ -31,6 +31,11 @@ struct OnboardingWindow: View {
         .frame(width: 640, height: 480)
         .onAppear { startPolling() }
         .onDisappear { stopPolling() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { @MainActor in
+                self.checkPermissions()
+            }
+        }
     }
 
     @ViewBuilder
@@ -192,9 +197,14 @@ struct OnboardingWindow: View {
 @MainActor
 final class OnboardingWindowController: NSWindowController {
     private let isPresented: Binding<Bool>
+    private let onClose: @MainActor () -> Void
 
-    init(isPresented: Binding<Bool>) {
+    init(
+        isPresented: Binding<Bool>,
+        onClose: @escaping @MainActor () -> Void
+    ) {
         self.isPresented = isPresented
+        self.onClose = onClose
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 480),
             styleMask: [.titled, .closable],
@@ -207,7 +217,10 @@ final class OnboardingWindowController: NSWindowController {
         let contentView = OnboardingWindow(isPresented: isPresented)
         window.contentView = NSHostingView(rootView: contentView)
         window.setFrameAutosaveName("OnboardingWindow")
-        window.delegate = OnboardingWindowDelegate(isPresented: isPresented)
+        window.delegate = OnboardingWindowDelegate(
+            isPresented: isPresented,
+            onClose: onClose
+        )
 
         super.init(window: window)
     }
@@ -226,9 +239,14 @@ final class OnboardingWindowController: NSWindowController {
 @MainActor
 private final class OnboardingWindowDelegate: NSObject, NSWindowDelegate {
     private let isPresented: Binding<Bool>
+    private let onClose: @MainActor () -> Void
 
-    init(isPresented: Binding<Bool>) {
+    init(
+        isPresented: Binding<Bool>,
+        onClose: @escaping @MainActor () -> Void
+    ) {
         self.isPresented = isPresented
+        self.onClose = onClose
     }
 
     @available(*, unavailable)
@@ -239,6 +257,7 @@ private final class OnboardingWindowDelegate: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         isPresented.wrappedValue = false
         UserDefaults.standard.set(true, forKey: "didShowOnboarding")
+        onClose()
     }
 }
 
@@ -247,19 +266,42 @@ final class OnboardingPresenter: ObservableObject {
     @Published private(set) var isPresented = false
     private var windowController: OnboardingWindowController?
 
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkAndShow()
+            }
+        }
+    }
+
     func checkAndShow() {
-        guard !UserDefaults.standard.bool(forKey: "didShowOnboarding") else { return }
+        let permissionsMissing = !PermissionProbe.screenRecordingGranted() || !PermissionProbe.accessibilityGranted()
+        guard permissionsMissing else {
+            dismiss()
+            return
+        }
+        guard !isPresented else { return }
         isPresented = true
         let binding = Binding(
             get: { self.isPresented },
             set: { self.isPresented = $0 }
         )
-        windowController = OnboardingWindowController(isPresented: binding)
+        windowController = OnboardingWindowController(
+            isPresented: binding,
+            onClose: { [weak self] in
+                self?.windowController = nil
+            }
+        )
         windowController?.show()
     }
 
     func dismiss() {
         isPresented = false
-        UserDefaults.standard.set(true, forKey: "didShowOnboarding")
+        windowController?.close()
+        windowController = nil
     }
 }

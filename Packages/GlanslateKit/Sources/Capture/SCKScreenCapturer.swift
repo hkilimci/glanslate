@@ -1,6 +1,4 @@
 import CoreGraphics
-import CoreImage
-import CoreImage.CIFilterBuiltins
 import Foundation
 import GlanslateCore
 import GlanslateGeometry
@@ -8,6 +6,8 @@ import GlanslatePlatform
 import ScreenCaptureKit
 
 public struct SCKScreenCapturer: ScreenCapturing {
+    private static let targetColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+
     public let excludedBundleIDs: Set<String>
     public let settleDelayNanoseconds: UInt64
 
@@ -68,15 +68,28 @@ public struct SCKScreenCapturer: ScreenCapturing {
         )
     }
 
-    /// Tone-map a possibly wide-gamut / HDR CGImage to sRGB, preserving dimensions.
+    /// Redraw a non-sRGB capture into sRGB, preserving dimensions.
     private func toneMapToSRGB(_ image: CGImage) -> CGImage {
-        let targetSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        let targetSpace = Self.targetColorSpace
         if let cs = image.colorSpace, cs.name == targetSpace.name { return image }
-        let ci = CIImage(cgImage: image)
-        let context = CIContext(options: [.workingColorSpace: CGColorSpaceCreateDeviceRGB()])
-        if let out = context.createCGImage(ci, from: ci.extent, format: .RGBA8, colorSpace: targetSpace) {
-            return out
+
+        // Redraw through Core Graphics to avoid the Core Image / Metal path here.
+        guard let context = CGContext(
+            data: nil,
+            width: image.width,
+            height: image.height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: targetSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return image
         }
-        return image
+
+        context.draw(
+            image,
+            in: CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        )
+        return context.makeImage() ?? image
     }
 }

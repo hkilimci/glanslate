@@ -34,6 +34,9 @@ public final class SettingsStore {
     public var subtitleTextColorHex: String          // #RRGGBB
     public var subtitleOutlineColorHex: String
 
+    // General
+    public var showDockIcon: Bool
+
     public let keychain: KeychainStore
 
     private let defaults: UserDefaults
@@ -53,6 +56,7 @@ public final class SettingsStore {
         self.subtitleShowBorder = defaults.object(forKey: "subtitleShowBorder") as? Bool ?? false
         self.subtitleTextColorHex = defaults.string(forKey: "subtitleTextColorHex") ?? "#FFFFFF"
         self.subtitleOutlineColorHex = defaults.string(forKey: "subtitleOutlineColorHex") ?? "#000000"
+        self.showDockIcon = defaults.object(forKey: "showDockIcon") as? Bool ?? false
     }
 
     public func persist() {
@@ -67,6 +71,7 @@ public final class SettingsStore {
         defaults.set(subtitleShowBorder, forKey: "subtitleShowBorder")
         defaults.set(subtitleTextColorHex, forKey: "subtitleTextColorHex")
         defaults.set(subtitleOutlineColorHex, forKey: "subtitleOutlineColorHex")
+        defaults.set(showDockIcon, forKey: "showDockIcon")
     }
 
     public func acceptDisclosure(for provider: TranslationProvider) {

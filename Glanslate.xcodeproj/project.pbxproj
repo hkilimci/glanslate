@@ -3,19 +3,20 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		2C07D9905655EF27934256FC /* MenuBarExtraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56329A2BDC48B3FCE2AF5BBF /* MenuBarExtraView.swift */; };
 		71E37523F0BB38C5C77C66F7 /* GlanslateKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4B5C21AB02CA94EBA2207939 /* GlanslateKit */; };
+		99ABCDEF1234567890FEDCBA /* OnboardingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1234567890ABCDEF00FEDCBA /* OnboardingWindow.swift */; };
 		DCCF63B32BC58A6013EDF6D1 /* SettingsSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9969193025C41AA841065E5 /* SettingsSceneView.swift */; };
 		F04304E0C6192B0CCCAE1555 /* GlanslateApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1172B96A481ED32A1C04AA3 /* GlanslateApp.swift */; };
 		F8D1FA0F82CCBFD05449EA7E /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3EF5737A3C99E1CC8CF873B /* AppRoot.swift */; };
-		99ABCDEF1234567890FEDCBA /* OnboardingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1234567890ABCDEF00FEDCBA /* OnboardingWindow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		1234567890ABCDEF00FEDCBA /* OnboardingWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindow.swift; sourceTree = "<group>"; };
 		56329A2BDC48B3FCE2AF5BBF /* MenuBarExtraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarExtraView.swift; sourceTree = "<group>"; };
 		7196C90C6552A927D6FC5A85 /* Glanslate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Glanslate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		75B1CDCE77ECD7F18E4EB309 /* GlanslateKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GlanslateKit; path = Packages/GlanslateKit; sourceTree = SOURCE_ROOT; };
@@ -23,7 +24,6 @@
 		C3EF5737A3C99E1CC8CF873B /* AppRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoot.swift; sourceTree = "<group>"; };
 		DD15C7B67AB5D80C4D12052B /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 		F1172B96A481ED32A1C04AA3 /* GlanslateApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanslateApp.swift; sourceTree = "<group>"; };
-		1234567890ABCDEF00FEDCBA /* OnboardingWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,10 +113,9 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					C30475ACCA472752F915FF04 = {
-						DevelopmentTeam = "$(GLANSLATE_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -134,7 +133,6 @@
 			packageReferences = (
 				4DB64ADE1360684EC46D1A4B /* XCLocalSwiftPackageReference "Packages/GlanslateKit" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -193,9 +191,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = J2WJMC3K74;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -215,6 +216,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -228,6 +230,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/Glanslate.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -249,6 +252,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/Glanslate.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -297,9 +301,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = J2WJMC3K74;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -312,6 +319,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;

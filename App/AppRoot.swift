@@ -2,6 +2,10 @@ import Foundation
 import Observation
 import GlanslateKit
 
+extension Notification.Name {
+    static let updateDockIconVisibility = Notification.Name("updateDockIconVisibility")
+}
+
 @MainActor
 @Observable
 final class AppRoot {
@@ -55,5 +59,16 @@ final class AppRoot {
 
         invocationController.setErrorToastPresenter(ErrorToastPresenter.shared)
         onboardingPresenter.checkAndShow()
+    }
+
+    func prepareForTermination() async {
+        onboardingPresenter.dismiss()
+        await invocationController.cancelCurrent()
+        await overlayPresenter.dismissAll()
+        await ErrorToastPresenter.shared.dismissCurrentToast()
+    }
+
+    func updateDockIconVisibility() {
+        NotificationCenter.default.post(name: .updateDockIconVisibility, object: nil)
     }
 }

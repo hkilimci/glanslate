@@ -21,7 +21,7 @@ public final class ErrorToastPresenter: ErrorToasting {
         dismissTask?.cancel()
         dismissTask = nil
 
-        currentToastWindow?.close()
+        dismiss(window: currentToastWindow)
 
         let toastWindow = ToastWindow(
             message: error.localizedDescription,
@@ -34,10 +34,24 @@ public final class ErrorToastPresenter: ErrorToasting {
             try? await Task.sleep(nanoseconds: 4_000_000_000)
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                toastWindow.performClose(nil)
-                currentToastWindow = nil
+                dismiss(window: toastWindow)
             }
         }
+    }
+
+    public func dismissCurrentToast() async {
+        dismissTask?.cancel()
+        dismissTask = nil
+        dismiss(window: currentToastWindow)
+    }
+
+    private func dismiss(window: NSWindow?) {
+        guard let window else { return }
+        if currentToastWindow === window {
+            currentToastWindow = nil
+        }
+        window.orderOut(nil)
+        window.close()
     }
 }
 
@@ -51,11 +65,14 @@ private final class ToastWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
+        self.isReleasedWhenClosed = false
         self.contentView = NSHostingView(rootView: contentView)
         self.isOpaque = false
         self.backgroundColor = .clear
         self.level = .floating
+        self.animationBehavior = .none
         self.hasShadow = true
+        self.ignoresMouseEvents = true
 
         if let display = display {
             positionOnDisplay(displayID: display)
@@ -65,15 +82,12 @@ private final class ToastWindow: NSWindow {
     }
 
     func show() {
-        self.alphaValue = 0
-        self.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            self.animator().alphaValue = 1
-        }
+        self.alphaValue = 1
+        self.orderFrontRegardless()
     }
+
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
 
     private func positionOnDisplay(displayID: CGDirectDisplayID) {
         guard let screen = NSScreen.screens.first(where: { $0.displayID == displayID }) else {
