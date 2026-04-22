@@ -147,6 +147,36 @@ private actor RecordingOverlayPresenter: OverlayPresenting {
     }
 }
 
+@MainActor
+private final class RecordingToastPresenter: ErrorToasting {
+    private(set) var errors: [GlanslateError] = []
+
+    func showToast(_ error: GlanslateError, display: CGDirectDisplayID?) async {
+        errors.append(error)
+    }
+}
+
+private actor RetranslationFailingTranslator: TranslationRouting {
+    func translate(
+        _ blocks: [TextBlock],
+        to target: Language,
+        invocationOverride: InvocationRoutingOverride?
+    ) async throws -> [GlanslateCore.Translation] {
+        if invocationOverride != nil {
+            throw GlanslateError.unsupportedPair(.deepL, from: .en, to: target)
+        }
+
+        return blocks.map { block in
+            GlanslateCore.Translation(
+                block: block,
+                translatedText: "\(target.rawValue)-openAI",
+                targetLanguage: target,
+                provider: .openAI
+            )
+        }
+    }
+}
+
 final class InvocationControllerTests: XCTestCase {
     @MainActor
     func testSelectionCancellationReturnsToIdle() async throws {
@@ -358,6 +388,43 @@ final class InvocationControllerTests: XCTestCase {
         await overlay.dismissAll()
     }
 
+    @MainActor
+    func testRetranslateFailureShowsToast() async throws {
+        let overlay = RecordingOverlayPresenter()
+        let toastPresenter = RecordingToastPresenter()
+        let controller = InvocationController(
+            topology: StubTopology(snapshot: sampleTopology()),
+            regionSelect: StubRegionSelector(selection: RegionSelection(region: sampleBlocks()[0].region, topology: sampleTopology())),
+            capture: StubCapture(source: sampleSource()),
+            detect: StubDetector(blocks: sampleBlocks()),
+            translate: RetranslationFailingTranslator(),
+            overlay: overlay,
+            history: try SwiftDataHistoryStore(inMemory: true),
+            settings: SettingsStore(
+                defaults: UserDefaults(suiteName: "InvocationRetranslateToast-\(UUID().uuidString)")!,
+                keychain: KeychainStore(service: "InvocationRetranslateToast-\(UUID().uuidString)")
+            )
+        )
+
+        controller.setErrorToastPresenter(toastPresenter)
+
+        await controller.start()
+        let handle = await waitForHandle(from: overlay)
+
+        await handle.requestRetranslation(
+            OverlayRetranslationRequest(
+                targetLanguage: .de,
+                provider: .deepL,
+                sourceLanguage: .en
+            )
+        )
+
+        let error = await waitForToastError(from: toastPresenter)
+        XCTAssertEqual(error, .unsupportedPair(.deepL, from: .en, to: .de))
+
+        await overlay.dismissAll()
+    }
+
     private func sampleTopology(capturedAt: Date = Date()) -> DisplayTopologySnapshot {
         DisplayTopologySnapshot(entries: [
             DisplayTopologyEntry(
@@ -413,6 +480,20 @@ final class InvocationControllerTests: XCTestCase {
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         )!
         return context.makeImage()!
+    }
+
+    @MainActor
+    private func waitForToastError(
+        from presenter: RecordingToastPresenter
+    ) async -> GlanslateError {
+        for _ in 0..<50 {
+            if let error = presenter.errors.last {
+                return error
+            }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTFail("Timed out waiting for retranslation toast")
+        return .cancelled
     }
 
     @MainActor

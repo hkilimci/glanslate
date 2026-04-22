@@ -19,13 +19,10 @@ struct OverlayToolbarLayout {
             max(260, min(displayBounds.width - (inset * 2), max(sourceRect.width, minimumWidth)))
         )
         let originX = min(
-            max(inset, sourceRect.maxX - width),
+            max(inset, sourceRect.midX - (width / 2)),
             displayBounds.maxX - width - inset
         )
-        let originY = min(
-            max(inset, sourceRect.minY + 8),
-            displayBounds.maxY - preferredSize.height - inset
-        )
+        let originY = inset
 
         return CGRect(
             x: originX,
@@ -37,7 +34,7 @@ struct OverlayToolbarLayout {
 }
 
 struct OverlayToolbarHoverState: Equatable, Sendable {
-    static let restingOpacity = 0.3
+    static let restingOpacity = 0.82
     static let activeOpacity = 1.0
     static let activationDistance = CGFloat(80)
 
@@ -65,17 +62,19 @@ struct OverlayToolbarView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Button(action: dismissAction) {
-                Image(systemName: "xmark")
-            }
-            .buttonStyle(.borderless)
+            toolbarIconButton(
+                systemName: "xmark",
+                foreground: .primary,
+                action: dismissAction
+            )
             .help("Dismiss")
 
-            Button(action: pinAction) {
-                Image(systemName: viewModel.isPinned ? "pin.fill" : "pin")
-            }
-            .buttonStyle(.borderless)
-            .disabled(viewModel.isPinned)
+            toolbarIconButton(
+                systemName: viewModel.isPinned ? "pin.fill" : "pin",
+                foreground: viewModel.isPinned ? .accentColor : .primary,
+                backgroundOpacity: viewModel.isPinned ? 0.18 : 0.12,
+                action: pinAction
+            )
             .help(viewModel.isPinned ? "Pinned to History" : "Pin to History")
 
             Label(
@@ -200,6 +199,22 @@ struct OverlayToolbarView: View {
         .animation(.easeInOut(duration: 0.14), value: viewModel.toolbarOpacity)
         .controlSize(.small)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func toolbarIconButton(
+        systemName: String,
+        foreground: Color,
+        backgroundOpacity: Double = 0.12,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(foreground)
+                .frame(width: 28, height: 28)
+                .background(Color.white.opacity(backgroundOpacity), in: Circle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func toolbarLabel(_ title: String, value: String) -> some View {

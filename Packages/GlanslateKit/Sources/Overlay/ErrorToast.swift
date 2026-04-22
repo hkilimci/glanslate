@@ -6,7 +6,7 @@ import GlanslateCore
 import GlanslateGeometry
 
 @MainActor
-public protocol ErrorToasting: AnyObject {
+public protocol ErrorToasting: AnyObject, Sendable {
     func showToast(_ error: GlanslateError, display: CGDirectDisplayID?) async
 }
 

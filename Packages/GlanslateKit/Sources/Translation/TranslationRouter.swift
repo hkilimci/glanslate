@@ -26,11 +26,16 @@ public actor TranslationRouter: TranslationRouting {
         guard !blocks.isEmpty else { return [] }
 
         let preferred = await resolvePreferred(invocationOverride?.provider)
-        let fallback  = await MainActor.run { settings.fallbackProvider }
+        let fallback = await MainActor.run { settings.fallbackProvider }
 
         let sourceLang = invocationOverride?.sourceLanguage ?? dominantLanguage(from: blocks)
 
-        let order = (preferred == fallback) ? [preferred] : [preferred, fallback]
+        let order: [TranslationProvider]
+        if invocationOverride?.provider != nil {
+            order = [preferred]
+        } else {
+            order = (preferred == fallback) ? [preferred] : [preferred, fallback]
+        }
 
         var lastError: GlanslateError?
         for provider in order {

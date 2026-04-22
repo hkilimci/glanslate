@@ -110,7 +110,7 @@ final class OverlaySessionViewModel {
     let invocationID: UUID
     let topology: DisplayTopologySnapshot
     let sourceRegion: DisplayLocalRect
-    let toolbarFrame: CGRect?
+    var toolbarRegion: DisplayLocalRect?
     var retainedSource: SourceVisualContext
     var translations: [GlanslateCore.Translation]
     var currentRequest: OverlayRetranslationRequest
@@ -132,12 +132,15 @@ final class OverlaySessionViewModel {
         if
             let entry = session.topology.entry(for: session.source.region.displayID)
         {
-            self.toolbarFrame = OverlayToolbarLayout.frame(
-                for: session.source.region.rect,
-                displaySize: entry.appKitFrame.size
+            self.toolbarRegion = DisplayLocalRect(
+                displayID: session.source.region.displayID,
+                rect: OverlayToolbarLayout.frame(
+                    for: session.source.region.rect,
+                    displaySize: entry.appKitFrame.size
+                )
             )
         } else {
-            self.toolbarFrame = nil
+            self.toolbarRegion = nil
         }
     }
 
@@ -146,8 +149,8 @@ final class OverlaySessionViewModel {
     }
 
     func toolbarFrame(for displayID: CGDirectDisplayID) -> CGRect? {
-        guard sourceRegion.displayID == displayID else { return nil }
-        return toolbarFrame
+        guard let toolbarRegion, toolbarRegion.displayID == displayID else { return nil }
+        return toolbarRegion.rect
     }
 
     func toolbarExclusionRects(for displayID: CGDirectDisplayID) -> [CGRect] {
@@ -252,7 +255,6 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
     }
 
     func prepareForRetranslation(_ request: OverlayRetranslationRequest) {
-        viewModel.currentRequest = request
         viewModel.isRetranslating = true
     }
 
@@ -333,20 +335,20 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
     private func presentToolbarIfNeeded() {
         guard
             let handle,
-            let toolbarFrame = viewModel.toolbarFrame(for: viewModel.sourceRegion.displayID)
+            let toolbarRegion = viewModel.toolbarRegion
         else {
             return
         }
 
         let converter = GeometryConverter(snapshot: viewModel.topology)
         let globalFrame = converter.appKitGlobal(
-            fromDisplayLocalRect: DisplayLocalRect(
-                displayID: viewModel.sourceRegion.displayID,
-                rect: toolbarFrame
-            )
+            fromDisplayLocalRect: toolbarRegion
         )
         let toolbarWindow = ManagedToolbarWindow(contentRect: globalFrame)
-        toolbarWindow.contentView = NSHostingView(rootView: OverlayToolbarView(
+        toolbarWindow.onFrameChanged = { [weak self] frame in
+            self?.updateToolbarPosition(withGlobalFrame: frame)
+        }
+        toolbarWindow.contentView = ManagedToolbarHostingView(rootView: OverlayToolbarView(
             viewModel: viewModel,
             settings: settings,
             dismissAction: {
@@ -371,12 +373,18 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
             }
         ))
         toolbarWindow.makeKeyAndOrderFront(nil)
+        updateToolbarPosition(withGlobalFrame: toolbarWindow.frame)
         self.toolbarWindow = toolbarWindow
         hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.updateToolbarHoverState()
             }
         }
+    }
+
+    private func updateToolbarPosition(withGlobalFrame frame: CGRect) {
+        let converter = GeometryConverter(snapshot: viewModel.topology)
+        viewModel.toolbarRegion = converter.displayLocal(fromAppKitGlobalRect: frame)
     }
 
     private func updateToolbarHoverState() {
@@ -414,6 +422,8 @@ final class ManagedOverlayWindow: NSWindow {
 
 @MainActor
 final class ManagedToolbarWindow: NSWindow {
+    var onFrameChanged: ((CGRect) -> Void)?
+
     init(contentRect: CGRect) {
         super.init(
             contentRect: contentRect,
@@ -428,11 +438,22 @@ final class ManagedToolbarWindow: NSWindow {
         backgroundColor = .clear
         hasShadow = false
         hidesOnDeactivate = false
-        isMovable = false
+        isMovable = true
+        isMovableByWindowBackground = true
     }
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    override func setFrameOrigin(_ point: NSPoint) {
+        super.setFrameOrigin(point)
+        onFrameChanged?(frame)
+    }
+}
+
+@MainActor
+final class ManagedToolbarHostingView<Content: View>: NSHostingView<Content> {
+    override var mouseDownCanMoveWindow: Bool { true }
 }
 
 @MainActor

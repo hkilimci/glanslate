@@ -287,6 +287,8 @@ public actor InvocationController {
         } catch {
             GlanslateLog.translate.error("Retranslation failed: \(error.localizedDescription, privacy: .public)")
             await overlayHandle.finishRetranslation()
+            let toastError = await retranslationError(from: error, request: request)
+            await showErrorToast(toastError)
         }
     }
 
@@ -335,10 +337,32 @@ public actor InvocationController {
         stateBroadcaster.yield(.errored(error))
         stateBroadcaster.yield(.idle)
 
-        Task { @MainActor in
-            let display = await overlay.currentDisplayID()
-            await errorToastPresenter?.showToast(error, display: display)
+        Task {
+            await self.showErrorToast(error)
         }
+    }
+
+    private func retranslationError(
+        from error: Error,
+        request: OverlayRetranslationRequest
+    ) async -> GlanslateError {
+        if let glanslateError = error as? GlanslateError {
+            return glanslateError
+        }
+
+        let provider: TranslationProvider
+        if let requestedProvider = request.provider {
+            provider = requestedProvider
+        } else {
+            provider = await MainActor.run { settings.preferredProvider }
+        }
+        return .translation(provider: provider, reason: error.localizedDescription)
+    }
+
+    private func showErrorToast(_ error: GlanslateError) async {
+        let display = await overlay.currentDisplayID()
+        let presenter = await MainActor.run { errorToastPresenter }
+        await presenter?.showToast(error, display: display)
     }
 }
 

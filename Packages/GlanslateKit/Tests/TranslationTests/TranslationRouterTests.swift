@@ -57,4 +57,43 @@ final class TranslationRouterTests: XCTestCase {
         XCTAssertEqual(translations.map(\.provider), [.openAI])
         XCTAssertEqual(translations.map(\.translatedText), ["fallback"])
     }
+
+    @MainActor
+    func testExplicitProviderOverrideDoesNotFallback() async throws {
+        let defaults = UserDefaults(suiteName: "TranslationRouterExplicit-\(UUID().uuidString)")!
+        let keychain = KeychainStore(service: "TranslationRouterExplicit-\(UUID().uuidString)")
+        let settings = SettingsStore(defaults: defaults, keychain: keychain)
+        settings.preferredProvider = .apple
+        settings.fallbackProvider = .openAI
+        settings.acceptDisclosure(for: .deepL)
+        settings.acceptDisclosure(for: .openAI)
+
+        let router = TranslationRouter(
+            engines: [
+                .deepL: StubEngine(identifier: .deepL, availability: .unsupported, resultText: "unused"),
+                .openAI: StubEngine(identifier: .openAI, availability: .supported, resultText: "fallback")
+            ],
+            settings: settings,
+            keychain: keychain
+        )
+
+        let block = TextBlock(
+            text: "hello",
+            region: DisplayLocalRect(displayID: 1, rect: .init(x: 0, y: 0, width: 10, height: 10)),
+            detectedLanguage: .en,
+            confidence: 1,
+            source: .vision
+        )
+
+        do {
+            _ = try await router.translate(
+                [block],
+                to: .tr,
+                invocationOverride: InvocationRoutingOverride(provider: .deepL)
+            )
+            XCTFail("Expected explicit provider override to fail without fallback")
+        } catch let error as GlanslateError {
+            XCTAssertEqual(error, .unsupportedPair(.deepL, from: .en, to: .tr))
+        }
+    }
 }
