@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 import GlanslateCore
 import GlanslatePlatform
 import GlanslateSettings
@@ -28,7 +29,9 @@ public actor TranslationRouter: TranslationRouting {
         let preferred = await resolvePreferred(invocationOverride?.provider)
         let fallback = await MainActor.run { settings.fallbackProvider }
 
-        let sourceLang = invocationOverride?.sourceLanguage ?? dominantLanguage(from: blocks)
+        let sourceLang = invocationOverride?.sourceLanguage
+            ?? dominantLanguage(from: blocks)
+            ?? combinedTextLanguage(from: blocks)
 
         let order: [TranslationProvider]
         if invocationOverride?.provider != nil {
@@ -81,6 +84,21 @@ public actor TranslationRouter: TranslationRouting {
         case .unsupported:
             throw GlanslateError.unsupportedPair(provider, from: from, to: to)
         }
+    }
+
+    /// Fallback source detection: combine every block's text and run NLLanguageRecognizer
+    /// once. Used when per-block `detectedLanguage` is absent or inconclusive — notably it
+    /// gives Apple Translation a concrete source, avoiding its blocking "Choose Language" dialog.
+    private func combinedTextLanguage(from blocks: [TextBlock]) -> Language? {
+        let combined = blocks
+            .map(\.text)
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !combined.isEmpty else { return nil }
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(combined)
+        guard let dominant = recognizer.dominantLanguage else { return nil }
+        return Language.from(nlCode: dominant)
     }
 
     private func dominantLanguage(from blocks: [TextBlock]) -> Language? {

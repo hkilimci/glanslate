@@ -28,6 +28,8 @@ final class RegionSelectionSession: @unchecked Sendable {
     private let topology: DisplayTopologySnapshot
     private let geometry: RegionSelectionGeometry
     private let model: RegionSelectionModel
+    private let windowEnumerator = WindowEnumerator()
+    private let clickThreshold: CGFloat = 4
     private var windows: [SelectionHUDWindow] = []
     private var continuation: CheckedContinuation<RegionSelection?, Never>?
     private var startPoint: CGPoint?
@@ -66,7 +68,35 @@ final class RegionSelectionSession: @unchecked Sendable {
 
     func completeDrag(at globalPoint: CGPoint) {
         guard let startPoint else { return }
-        let evaluation = geometry.evaluate(from: startPoint, to: globalPoint)
+        let dragDistance = hypot(globalPoint.x - startPoint.x, globalPoint.y - startPoint.y)
+
+        if dragDistance < clickThreshold {
+            // A click rather than a drag — snap to the window under the cursor if enabled.
+            if model.snapEnabled,
+               let windowRect = windowEnumerator.window(at: globalPoint, primaryTopY: topology.primaryTopY) {
+                handle(geometry.evaluate(globalRect: windowRect))
+            } else {
+                resetDrag()
+            }
+            return
+        }
+
+        handle(geometry.evaluate(from: startPoint, to: globalPoint))
+    }
+
+    func updateHover(at globalPoint: CGPoint) {
+        guard model.snapEnabled, startPoint == nil else { return }
+        model.hoveredWindowRect = windowEnumerator.window(at: globalPoint, primaryTopY: topology.primaryTopY)
+    }
+
+    func toggleSnap() {
+        model.snapEnabled.toggle()
+        if !model.snapEnabled {
+            model.hoveredWindowRect = nil
+        }
+    }
+
+    private func handle(_ evaluation: RegionSelectionEvaluation) {
         model.activeDisplayID = evaluation.activeDisplayID
         model.normalizedGlobalRect = evaluation.normalizedGlobalRect
 
@@ -131,6 +161,8 @@ final class RegionSelectionModel {
     var normalizedGlobalRect: CGRect = .null
     var statusMessage: String?
     var rejectionPulse = false
+    var snapEnabled = true
+    var hoveredWindowRect: CGRect?
 
     var dimensionsText: String? {
         guard !normalizedGlobalRect.isNull, normalizedGlobalRect.width > 0, normalizedGlobalRect.height > 0 else {
@@ -149,6 +181,7 @@ final class RegionSelectInputView: NSView {
     private let geometry: RegionSelectionGeometry
     private unowned let session: RegionSelectionSession
     private let hostingView: NSHostingView<RegionSelectHUDView>
+    private var trackingArea: NSTrackingArea?
 
     init(
         entry: DisplayTopologyEntry,
@@ -185,6 +218,22 @@ final class RegionSelectInputView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
+        window?.acceptsMouseMovedEvents = true
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseMoved, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
     }
 
     override func resetCursorRects() {
@@ -203,10 +252,17 @@ final class RegionSelectInputView: NSView {
         session.completeDrag(at: NSEvent.mouseLocation)
     }
 
+    override func mouseMoved(with event: NSEvent) {
+        session.updateHover(at: NSEvent.mouseLocation)
+    }
+
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 {
+        switch event.keyCode {
+        case 53: // Esc
             session.cancel()
-        } else {
+        case 48: // Tab
+            session.toggleSnap()
+        default:
             super.keyDown(with: event)
         }
     }
@@ -232,6 +288,17 @@ private struct RegionSelectHUDView: View {
                     )
                 )
                 .ignoresSafeArea()
+
+            if let hoverRect {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.white.opacity(0.85), lineWidth: 1.5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white.opacity(0.12))
+                    )
+                    .frame(width: hoverRect.width, height: hoverRect.height)
+                    .offset(x: hoverRect.minX, y: hoverRect.minY)
+            }
 
             if let marqueeRect {
                 RoundedRectangle(cornerRadius: 8)
@@ -273,6 +340,15 @@ private struct RegionSelectHUDView: View {
         guard model.activeDisplayID == entry.displayID else { return nil }
         guard !model.normalizedGlobalRect.isNull else { return nil }
         return geometry.localRect(for: model.normalizedGlobalRect, on: entry.displayID)
+    }
+
+    private var hoverRect: CGRect? {
+        guard model.snapEnabled else { return nil }
+        guard model.normalizedGlobalRect.isNull else { return nil }
+        guard let global = model.hoveredWindowRect else { return nil }
+        guard let local = geometry.localRect(for: global, on: entry.displayID),
+              local.width > 1, local.height > 1 else { return nil }
+        return local
     }
 }
 

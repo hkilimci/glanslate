@@ -33,7 +33,7 @@ final class AppRoot {
             engines: [
                 .apple: AppleTranslationEngine.create(),
                 .deepL: DeepLEngine(keychain: keychain),
-                .google: GoogleEngine(keychain: keychain),
+                .google: GoogleEngine(http: HTTPClient(timeout: 10)),
                 .openAI: OpenAIEngine(keychain: keychain)
             ],
             settings: settingsStore,

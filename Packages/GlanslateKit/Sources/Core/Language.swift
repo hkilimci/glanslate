@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 public enum Language: String, Hashable, Sendable, Codable, CaseIterable {
     case auto
@@ -39,6 +40,32 @@ public enum Language: String, Hashable, Sendable, Codable, CaseIterable {
         switch self {
         case .ar, .he: return true
         default: return false
+        }
+    }
+
+    public static func from(nlCode code: NLLanguage) -> Language? {
+        switch code {
+        case .english: return .en
+        case .turkish: return .tr
+        case .spanish: return .es
+        case .french: return .fr
+        case .german: return .de
+        case .italian: return .it
+        case .portuguese: return .pt
+        case .russian: return .ru
+        case .japanese: return .ja
+        case .korean: return .ko
+        case .simplifiedChinese: return .zhHans
+        case .traditionalChinese: return .zhHant
+        case .arabic: return .ar
+        case .hindi: return .hi
+        case .polish: return .pl
+        case .dutch: return .nl
+        case .swedish: return .sv
+        case .czech: return .cs
+        case .ukrainian: return .uk
+        case .hebrew: return .he
+        default: return nil
         }
     }
 }

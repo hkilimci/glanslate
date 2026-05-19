@@ -6,11 +6,12 @@ import XCTest
 @testable import GlanslateOverlay
 
 final class OverlayLayoutEngineTests: XCTestCase {
-    func testLongTextExpandsWithinSourceBoundsAndKeepsCenterWhenPossible() {
+    func testLongTranslationGrowsButStaysAnchoredToSourceOrigin() {
         let source = sampleSource(region: CGRect(x: 20, y: 20, width: 520, height: 360))
+        let blockRect = CGRect(x: 210, y: 150, width: 80, height: 24)
         let translation = makeTranslation(
             text: "This is a much longer translated block that should need more room than the original source rect allows for a comfortable patch layout.",
-            blockRect: CGRect(x: 210, y: 150, width: 80, height: 24),
+            blockRect: blockRect,
             language: .en
         )
 
@@ -21,11 +22,30 @@ final class OverlayLayoutEngineTests: XCTestCase {
         )
 
         XCTAssertTrue(source.region.rect.contains(rendered.frame))
-        XCTAssertGreaterThan(rendered.frame.width, translation.block.region.rect.width)
-        XCTAssertGreaterThan(rendered.frame.height, translation.block.region.rect.height)
-        XCTAssertEqual(rendered.frame.midX, translation.block.region.rect.midX, accuracy: 0.5)
-        XCTAssertTrue(rendered.frame.minY <= translation.block.region.rect.midY)
-        XCTAssertTrue(rendered.frame.maxY >= translation.block.region.rect.midY)
+        // The box grows to fit the longer translation...
+        XCTAssertGreaterThan(rendered.frame.height, blockRect.height)
+        // ...but the box stays anchored to the source — its top-left corner does not drift.
+        XCTAssertLessThanOrEqual(rendered.frame.minX, blockRect.minX + 0.5)
+        XCTAssertEqual(rendered.frame.minY, blockRect.minY, accuracy: 0.5)
+    }
+
+    func testShortTranslationDoesNotProduceOversizedBox() {
+        let source = sampleSource(region: CGRect(x: 0, y: 0, width: 400, height: 300))
+        let blockRect = CGRect(x: 60, y: 80, width: 160, height: 28)
+        let translation = makeTranslation(text: "Hi", blockRect: blockRect, language: .en)
+
+        let rendered = OverlayLayoutEngine.renderedBlock(
+            for: translation,
+            source: source,
+            style: .cleanPatch
+        )
+
+        // A short translation must not blow the box up to the whole selection.
+        XCTAssertLessThan(rendered.frame.width, source.region.rect.width)
+        XCTAssertLessThan(rendered.frame.height, source.region.rect.height)
+        // It stays anchored on the source block.
+        XCTAssertEqual(rendered.frame.minX, blockRect.minX, accuracy: 0.5)
+        XCTAssertEqual(rendered.frame.minY, blockRect.minY, accuracy: 0.5)
     }
 
     func testArabicUsesRightToLeftDirectionAndTrailingAlignment() {
