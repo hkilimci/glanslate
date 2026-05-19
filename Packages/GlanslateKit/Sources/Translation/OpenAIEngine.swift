@@ -7,13 +7,13 @@ public struct OpenAIEngine: TranslationEngine {
     public let http: HTTPClient
     public let keychain: KeychainStore
     public let keyAccount: String
-    public let model: @Sendable () -> String
+    public let model: @Sendable () async -> String
 
     public init(
         http: HTTPClient = HTTPClient(),
         keychain: KeychainStore = KeychainStore(),
         keyAccount: String = "openAI.apiKey",
-        model: @escaping @Sendable () -> String = { "gpt-4o-mini" }
+        model: @escaping @Sendable () async -> String = { "gpt-4o-mini" }
     ) {
         self.http = http
         self.keychain = keychain
@@ -70,7 +70,7 @@ public struct OpenAIEngine: TranslationEngine {
         """
 
         let body: [String: Any] = [
-            "model": model(),
+            "model": await model(),
             "input": input,
             "text": [
                 "format": [
