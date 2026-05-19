@@ -10,20 +10,17 @@ public struct VisionCandidate: Sendable {
     public init() {}
 
     public func detect(_ source: SourceVisualContext) async throws -> [TextBlock] {
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-        request.automaticallyDetectsLanguage = true
-        request.minimumTextHeight = 0.01
-
-        let handler = VNImageRequestHandler(cgImage: source.image, options: [:])
+        let observations: [VNRecognizedTextObservation]
         do {
-            try handler.perform([request])
+            observations = try recognize(in: source, level: .accurate)
         } catch {
-            throw GlanslateError.detection(reason: "Vision perform failed: \(error.localizedDescription)")
+            // Accurate recognition can fail on platform-model errors; retry once at .fast.
+            do {
+                observations = try recognize(in: source, level: .fast)
+            } catch {
+                throw GlanslateError.detection(reason: "Vision perform failed: \(error.localizedDescription)")
+            }
         }
-
-        let observations = (request.results ?? []).compactMap { $0 as VNRecognizedTextObservation }
         guard !observations.isEmpty else { return [] }
 
         let converter = GeometryConverter(snapshot: source.topology)
@@ -49,6 +46,21 @@ public struct VisionCandidate: Sendable {
                 source: .vision
             )
         }
+    }
+
+    private func recognize(
+        in source: SourceVisualContext,
+        level: VNRequestTextRecognitionLevel
+    ) throws -> [VNRecognizedTextObservation] {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = level
+        request.usesLanguageCorrection = true
+        request.automaticallyDetectsLanguage = true
+        request.minimumTextHeight = 0.01
+
+        let handler = VNImageRequestHandler(cgImage: source.image, options: [:])
+        try handler.perform([request])
+        return (request.results ?? []).compactMap { $0 as VNRecognizedTextObservation }
     }
 
     struct DetectedLine {
@@ -139,32 +151,3 @@ extension Array where Element == (language: Language, prob: Double) {
     }
 }
 
-public extension Language {
-    static func from(nlCode code: NLLanguage) -> Language? {
-        switch code {
-        case .english: return .en
-        case .turkish: return .tr
-        case .spanish: return .es
-        case .french: return .fr
-        case .german: return .de
-        case .italian: return .it
-        case .portuguese: return .pt
-        case .russian: return .ru
-        case .japanese: return .ja
-        case .korean: return .ko
-        case .simplifiedChinese: return .zhHans
-        case .traditionalChinese: return .zhHant
-        case .arabic: return .ar
-        case .hindi: return .hi
-        case .polish: return .pl
-        case .dutch: return .nl
-        case .swedish: return .sv
-        case .czech: return .cs
-        case .ukrainian: return .uk
-        case .hebrew: return .he
-        default: return nil
-        }
-    }
-
-
-}

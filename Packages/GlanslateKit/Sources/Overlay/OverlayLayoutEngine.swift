@@ -46,75 +46,79 @@ struct OverlayLayoutEngine: Sendable {
         let alignment: OverlayTextAlignment = translation.targetLanguage.isRightToLeft ? .trailing : .leading
         let direction: OverlayTextDirection = translation.targetLanguage.isRightToLeft ? .rightToLeft : .leftToRight
 
-        let minFontSize = style == .subtitle ? CGFloat(12) : CGFloat(14)
-        var fontSize = max(minFontSize, min(24, max(original.height * 0.72, minFontSize)))
-        let horizontalPadding = style == .subtitle ? CGFloat(0) : max(8, original.height * 0.22)
-        let verticalPadding = style == .subtitle ? CGFloat(0) : max(6, original.height * 0.16)
-        let maximumSize = CGSize(width: bounds.width, height: bounds.height)
-        let weight = style == .subtitle ? NSFont.Weight.bold : NSFont.Weight.semibold
+        let minFontSize: CGFloat = style == .subtitle ? 12 : 14
+        let maxFontSize: CGFloat = 28
+        // Scale the font to the source line height (macshot's 0.65 ratio), kept within readable bounds.
+        var fontSize = max(minFontSize, min(maxFontSize, original.height * 0.65))
+        let horizontalPadding: CGFloat = style == .subtitle ? 0 : max(8, original.height * 0.22)
+        let verticalPadding: CGFloat = style == .subtitle ? 0 : max(6, original.height * 0.16)
+        let weight: NSFont.Weight = style == .subtitle ? .bold : .semibold
 
-        var targetSize = CGSize(
-            width: max(original.width, min(maximumSize.width, original.width + (horizontalPadding * 2))),
-            height: max(original.height, min(maximumSize.height, original.height + (verticalPadding * 2)))
+        let maxWidth = bounds.width
+        let maxHeight = bounds.height
+        // Room available growing straight down from the source top edge (no upward drift).
+        let maxDownHeight = min(maxHeight, max(original.height, bounds.maxY - original.minY))
+
+        // The box never starts smaller than the source text box.
+        var boxWidth = min(maxWidth, max(original.width, original.width + horizontalPadding * 2))
+        var boxHeight = min(maxDownHeight, max(original.height, original.height + verticalPadding * 2))
+
+        func textWidth(for width: CGFloat) -> CGFloat {
+            max(width - horizontalPadding * 2, 24)
+        }
+        func neededHeight(at width: CGFloat) -> CGFloat {
+            measure(
+                text: translation.translatedText,
+                width: textWidth(for: width),
+                fontSize: fontSize,
+                weight: weight
+            ).height + verticalPadding * 2
+        }
+
+        // `measure` wraps to the given width, so width never overflows on its own. To fit a
+        // longer translation: grow height downward, then widen the box (which reduces the line
+        // count and height), then shrink the font, and only as a last resort grow past the
+        // downward room. Every dimension is monotonic and capped, so this terminates.
+        while true {
+            let need = neededHeight(at: boxWidth)
+            if need <= boxHeight + 1 { break }
+            if boxHeight < maxDownHeight {
+                boxHeight = min(maxDownHeight, need)
+                continue
+            }
+            if boxWidth < maxWidth {
+                boxWidth = min(maxWidth, boxWidth + max(40, boxWidth * 0.25))
+                continue
+            }
+            if fontSize > minFontSize {
+                fontSize = max(minFontSize, fontSize - 1)
+                continue
+            }
+            if boxHeight < maxHeight {
+                boxHeight = min(maxHeight, need)
+                continue
+            }
+            break
+        }
+
+        // Shrink the box back to a snug fit around the final text.
+        let finalMeasured = measure(
+            text: translation.translatedText,
+            width: textWidth(for: boxWidth),
+            fontSize: fontSize,
+            weight: weight
         )
+        boxWidth = min(boxWidth, max(original.width, finalMeasured.width + horizontalPadding * 2))
+        boxHeight = min(boxHeight, max(original.height, finalMeasured.height + verticalPadding * 2))
 
-        func fittedRect() -> CGRect {
-            centeredClampedRect(
-                around: CGPoint(x: original.midX, y: original.midY),
-                size: targetSize,
-                within: bounds
-            )
-        }
-
-        for _ in 0..<8 {
-            let rect = fittedRect()
-            let measured = measure(
-                text: translation.translatedText,
-                width: max(rect.width - (horizontalPadding * 2), 24),
-                fontSize: fontSize,
-                weight: weight
-            )
-            let neededWidth = measured.width + (horizontalPadding * 2)
-            let neededHeight = measured.height + (verticalPadding * 2)
-
-            let fits = neededWidth <= rect.width + 1 && neededHeight <= rect.height + 1
-            if fits { break }
-
-            let canGrowWidth = rect.width < maximumSize.width
-            let canGrowHeight = rect.height < maximumSize.height
-
-            if canGrowWidth {
-                targetSize.width = min(maximumSize.width, max(rect.width * 1.18, neededWidth))
-            }
-            if canGrowHeight {
-                targetSize.height = min(maximumSize.height, max(rect.height * 1.14, neededHeight))
-            }
-
-            if !canGrowWidth && !canGrowHeight {
-                if fontSize > minFontSize {
-                    fontSize -= 1
-                } else {
-                    break
-                }
-            }
-        }
-
-        while fontSize > minFontSize {
-            let rect = fittedRect()
-            let measured = measure(
-                text: translation.translatedText,
-                width: max(rect.width - (horizontalPadding * 2), 24),
-                fontSize: fontSize,
-                weight: weight
-            )
-            let fits = measured.height + (verticalPadding * 2) <= rect.height + 1
-                && measured.width + (horizontalPadding * 2) <= rect.width + 1
-            if fits { break }
-            fontSize -= 1
-        }
-
+        let baseRect = anchoredRect(
+            source: original,
+            size: CGSize(width: boxWidth, height: boxHeight),
+            within: bounds,
+            direction: direction
+        )
         let finalFrame = adjustedToAvoidExcludedRects(
-            fittedRect(),
+            baseRect,
             within: bounds,
             excludedRects: excludedRects
         )
@@ -131,20 +135,42 @@ struct OverlayLayoutEngine: Sendable {
         )
     }
 
-    private static func centeredClampedRect(
-        around center: CGPoint,
+    /// Anchors the overlay box to the source block's leading-top corner and grows it in the
+    /// reading direction and downward, clamped to `bounds`. The box never drifts off the
+    /// source text the way a centroid-centered box does when the translation length differs.
+    private static func anchoredRect(
+        source original: CGRect,
         size: CGSize,
-        within bounds: CGRect
+        within bounds: CGRect,
+        direction: OverlayTextDirection
     ) -> CGRect {
         let width = min(size.width, bounds.width)
         let height = min(size.height, bounds.height)
-        var origin = CGPoint(
-            x: center.x - (width / 2),
-            y: center.y - (height / 2)
-        )
-        origin.x = min(max(origin.x, bounds.minX), bounds.maxX - width)
-        origin.y = min(max(origin.y, bounds.minY), bounds.maxY - height)
-        return CGRect(origin: origin, size: CGSize(width: width, height: height))
+
+        var originX: CGFloat
+        switch direction {
+        case .leftToRight:
+            originX = original.minX
+            if originX + width > bounds.maxX {
+                originX = bounds.maxX - width
+            }
+            originX = max(originX, bounds.minX)
+        case .rightToLeft:
+            var maxX = original.maxX
+            if maxX - width < bounds.minX {
+                maxX = bounds.minX + width
+            }
+            maxX = min(maxX, bounds.maxX)
+            originX = maxX - width
+        }
+
+        var originY = original.minY
+        if originY + height > bounds.maxY {
+            originY = bounds.maxY - height
+        }
+        originY = max(originY, bounds.minY)
+
+        return CGRect(x: originX, y: originY, width: width, height: height)
     }
 
     private static func measure(

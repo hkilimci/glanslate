@@ -1,77 +1,99 @@
 import Foundation
 import GlanslateCore
-import GlanslatePlatform
 
 public struct GoogleEngine: TranslationEngine {
     public let identifier: TranslationProvider = .google
     public let http: HTTPClient
-    public let keychain: KeychainStore
-    public let keyAccount: String
-    public let projectAccount: String
 
-    public init(
-        http: HTTPClient = HTTPClient(),
-        keychain: KeychainStore = KeychainStore(),
-        keyAccount: String = "google.apiKey",
-        projectAccount: String = "google.projectId"
-    ) {
+    public init(http: HTTPClient = HTTPClient()) {
         self.http = http
-        self.keychain = keychain
-        self.keyAccount = keyAccount
-        self.projectAccount = projectAccount
     }
 
     public func canTranslate(from: Language?, to: Language) async -> AvailabilityStatus {
-        let key = (try? keychain.get(keyAccount)) ?? nil
-        guard let key, !key.isEmpty else { return .unsupported }
-        return .supported
+        googleCode(for: to) != nil ? .supported : .unsupported
     }
 
     public func translate(_ blocks: [TextBlock], from: Language?, to: Language) async throws -> [Translation] {
-        guard let key = try keychain.get(keyAccount), !key.isEmpty else {
-            throw GlanslateError.missingAPIKey(.google)
+        guard !blocks.isEmpty else { return [] }
+        guard let tl = googleCode(for: to) else {
+            throw GlanslateError.unsupportedPair(.google, from: from, to: to)
         }
-        var results: [Translation] = []
-        for batch in blocks.chunked(into: 128) {
-            try Task.checkCancellation()
-            let url = URL(string: "https://language.googleapis.com/language/translate/v2?key=\(key)")!
-            var req = URLRequest(url: url)
-            req.httpMethod = "POST"
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            let body: [String: Any] = [
-                "q": batch.map { $0.text },
-                "target": to.bcp47,
-            ].merging(from.flatMap { $0 == .auto ? nil : ["source": $0.bcp47] } ?? [:]) { a, _ in a }
-            req.httpBody = try JSONSerialization.data(withJSONObject: body)
-            let (data, resp) = try await http.perform(req)
-            guard (200...299).contains(resp.statusCode) else {
-                throw GlanslateError.translation(provider: .google, reason: "HTTP \(resp.statusCode)")
-            }
-            struct GoogleResponse: Decodable {
-                struct DataPayload: Decodable {
-                    struct T: Decodable { let translatedText: String }
-                    let translations: [T]
+        try Task.checkCancellation()
+
+        let translatedTexts = try await withThrowingTaskGroup(of: (Int, String).self) { group -> [String] in
+            for (index, block) in blocks.enumerated() {
+                group.addTask {
+                    try Task.checkCancellation()
+                    return (index, try await translateOne(text: block.text, tl: tl))
                 }
-                let data: DataPayload
             }
-            let decoded: GoogleResponse
-            do {
-                decoded = try JSONDecoder().decode(GoogleResponse.self, from: data)
-            } catch {
-                throw GlanslateError.translation(provider: .google, reason: "Decode failed")
+            var ordered = Array(repeating: "", count: blocks.count)
+            for try await (index, text) in group {
+                ordered[index] = text
             }
-            guard decoded.data.translations.count == batch.count else {
-                throw GlanslateError.translation(provider: .google, reason: "Mismatched batch count")
-            }
-            for (i, t) in decoded.data.translations.enumerated() {
-                results.append(Translation(
-                    block: batch[i],
-                    translatedText: t.translatedText,
-                    targetLanguage: to,
-                    provider: .google
-                ))
-            }
+            return ordered
         }
-        return results
+
+        return zip(blocks, translatedTexts).map { block, text in
+            Translation(
+                block: block,
+                translatedText: text,
+                targetLanguage: to,
+                provider: .google
+            )
+        }
+    }
+
+    /// Maps a glanslate `Language` to the language code expected by the keyless endpoint.
+    /// Returns nil for `.auto`, which is never a valid translation target.
+    func googleCode(for language: Language) -> String? {
+        switch language {
+        case .auto: return nil
+        case .zhHans: return "zh-CN"
+        case .zhHant: return "zh-TW"
+        default: return language.rawValue
+        }
+    }
+
+    private func translateOne(text: String, tl: String) async throws -> String {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
+
+        var components = URLComponents(string: "https://translate.googleapis.com/translate_a/single")!
+        components.queryItems = [
+            URLQueryItem(name: "client", value: "gtx"),
+            URLQueryItem(name: "sl", value: "auto"),
+            URLQueryItem(name: "tl", value: tl),
+            URLQueryItem(name: "dt", value: "t"),
+            URLQueryItem(name: "q", value: text),
+        ]
+        guard let url = components.url else {
+            throw GlanslateError.translation(provider: .google, reason: "Bad URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await http.perform(request)
+        guard (200...299).contains(response.statusCode) else {
+            throw GlanslateError.translation(provider: .google, reason: "HTTP \(response.statusCode)")
+        }
+        return try Self.parseKeylessResponse(data)
+    }
+
+    /// Parses the keyless `translate_a/single` payload: a JSON array whose first element
+    /// is an array of segment arrays; each segment's first element is the translated string.
+    static func parseKeylessResponse(_ data: Data) throws -> String {
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [Any],
+            let segments = json.first as? [[Any]]
+        else {
+            throw GlanslateError.translation(provider: .google, reason: "Decode failed")
+        }
+        let pieces = segments.compactMap { $0.first as? String }
+        guard !pieces.isEmpty else {
+            throw GlanslateError.translation(provider: .google, reason: "Empty translation")
+        }
+        return pieces.joined()
     }
 }

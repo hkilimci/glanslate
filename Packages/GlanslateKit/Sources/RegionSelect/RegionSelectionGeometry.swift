@@ -78,6 +78,46 @@ public struct RegionSelectionGeometry: Sendable {
         )
     }
 
+    /// Evaluates a whole-window (or otherwise pre-formed) AppKit-global rect as a selection.
+    /// The rect is clamped to the display under its center so a partially off-screen window
+    /// still resolves cleanly instead of being rejected as cross-screen.
+    public func evaluate(
+        globalRect rect: CGRect,
+        minimumDimension: CGFloat = 4
+    ) -> RegionSelectionEvaluation {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let activeDisplayID = activeDisplayID(for: center)
+
+        let clamped: CGRect
+        if let id = activeDisplayID, let entry = topology.entry(for: id) {
+            clamped = rect.intersection(entry.appKitFrame)
+        } else {
+            clamped = rect
+        }
+
+        guard !clamped.isNull, clamped.width >= minimumDimension, clamped.height >= minimumDimension else {
+            return RegionSelectionEvaluation(
+                activeDisplayID: activeDisplayID,
+                normalizedGlobalRect: clamped.isNull ? rect : clamped,
+                outcome: .tooSmall
+            )
+        }
+
+        if let localRect = converter.displayLocal(fromAppKitGlobalRect: clamped) {
+            return RegionSelectionEvaluation(
+                activeDisplayID: activeDisplayID,
+                normalizedGlobalRect: clamped,
+                outcome: .selected(localRect)
+            )
+        }
+
+        return RegionSelectionEvaluation(
+            activeDisplayID: activeDisplayID,
+            normalizedGlobalRect: clamped,
+            outcome: .crossScreenRejected
+        )
+    }
+
     public func localRect(
         for globalRect: CGRect,
         on displayID: CGDirectDisplayID

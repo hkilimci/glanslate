@@ -42,6 +42,30 @@ final class RegionSelectionGeometryTests: XCTestCase {
         )
     }
 
+    func testEvaluateGlobalRectReturnsDisplayLocalRect() {
+        let geometry = RegionSelectionGeometry(topology: sampleTopology())
+        let evaluation = geometry.evaluate(globalRect: CGRect(x: 20, y: 30, width: 40, height: 25))
+
+        XCTAssertEqual(
+            evaluation.outcome,
+            .selected(DisplayLocalRect(
+                displayID: 1,
+                rect: CGRect(x: 20, y: 45, width: 40, height: 25)
+            ))
+        )
+    }
+
+    func testEvaluateGlobalRectClampsAnOversizedWindowToTheDisplay() {
+        let geometry = RegionSelectionGeometry(topology: sampleTopology())
+        // A window taller than the display should clamp to it, not be rejected.
+        let evaluation = geometry.evaluate(globalRect: CGRect(x: 10, y: -100, width: 50, height: 300))
+
+        guard case .selected = evaluation.outcome else {
+            return XCTFail("Expected a clamped selection, got \(evaluation.outcome)")
+        }
+        XCTAssertEqual(evaluation.activeDisplayID, 1)
+    }
+
     private func sampleTopology() -> DisplayTopologySnapshot {
         DisplayTopologySnapshot(entries: [
             DisplayTopologyEntry(
