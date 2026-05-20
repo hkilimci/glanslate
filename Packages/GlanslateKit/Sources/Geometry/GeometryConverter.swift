@@ -31,7 +31,11 @@ public struct GeometryConverter: Sendable {
         ]
         var ids: Set<CGDirectDisplayID> = []
         for c in corners {
-            guard let hit = snapshot.entries.first(where: { $0.appKitFrame.contains(c) }) else {
+            guard let hit = snapshot.entries.first(where: {
+                // CGRect.contains excludes the max edge, so expand the frame
+                // by a microscopic amount to treat border points as inside.
+                $0.appKitFrame.insetBy(dx: -1e-9, dy: -1e-9).contains(c)
+            }) else {
                 return nil
             }
             ids.insert(hit.displayID)

@@ -32,7 +32,22 @@ struct OverlayLayoutEngine: Sendable {
         style: OverlayStyle,
         excludedRects: [CGRect] = []
     ) -> [OverlayRenderedBlock] {
-        translations.map { renderedBlock(for: $0, source: source, style: style, excludedRects: excludedRects) }
+        var results: [OverlayRenderedBlock] = []
+        var cumulativeExcluded = excludedRects
+
+        for translation in translations {
+            let block = renderedBlock(
+                for: translation,
+                source: source,
+                style: style,
+                excludedRects: cumulativeExcluded
+            )
+            results.append(block)
+            // Add this block (with a small padding) to exclusions so subsequent blocks avoid it.
+            cumulativeExcluded.append(block.frame.insetBy(dx: -4, dy: -4))
+        }
+
+        return results
     }
 
     static func renderedBlock(

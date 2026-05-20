@@ -12,7 +12,9 @@ final class PlatformSmokeTests: XCTestCase {
 
             try store.delete("account")
             XCTAssertNil(try store.get("account"))
-        } catch KeychainStore.KeychainError.unhandled(let status) where status == errSecNotAvailable {
+        } catch KeychainStore.KeychainError.unhandled(let status)
+            where status == errSecNotAvailable || status == errSecMissingEntitlement
+        {
             throw XCTSkip("Keychain is not available in this test environment.")
         }
     }

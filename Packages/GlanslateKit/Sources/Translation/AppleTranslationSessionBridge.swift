@@ -53,8 +53,11 @@ final class AppleTranslationSessionBridge: ObservableObject {
             }
         } onCancel: { [weak self] in
             guard let self else { return }
-            if let job = self.currentJob {
-                self.finish(jobID: job.id, result: .failure(CancellationError()))
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if let job = self.currentJob {
+                    self.finish(jobID: job.id, result: .failure(CancellationError()))
+                }
             }
         }
     }

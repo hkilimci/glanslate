@@ -90,9 +90,9 @@ public struct RegionSelectionGeometry: Sendable {
 
         let clamped: CGRect
         if let id = activeDisplayID, let entry = topology.entry(for: id) {
-            clamped = rect.intersection(entry.appKitFrame)
+            clamped = rect.intersection(entry.appKitFrame).integral
         } else {
-            clamped = rect
+            clamped = rect.integral
         }
 
         guard !clamped.isNull, clamped.width >= minimumDimension, clamped.height >= minimumDimension else {
@@ -103,7 +103,8 @@ public struct RegionSelectionGeometry: Sendable {
             )
         }
 
-        if let localRect = converter.displayLocal(fromAppKitGlobalRect: clamped) {
+        let localRect = converter.displayLocal(fromAppKitGlobalRect: clamped)
+        if let localRect = localRect {
             return RegionSelectionEvaluation(
                 activeDisplayID: activeDisplayID,
                 normalizedGlobalRect: clamped,
