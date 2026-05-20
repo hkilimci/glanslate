@@ -107,11 +107,11 @@ public actor InvocationController {
         self.errorToastPresenter = presenter
     }
 
-    public func start() {
+    public func start() async {
+        await cancelCurrentInternal()
+
         let snapshot = topology.current()
         let invocationID = UUID()
-
-        cancelCurrentInternal()
 
         currentInvocationID = invocationID
         stateBroadcaster.yield(.selecting)
@@ -121,11 +121,11 @@ public actor InvocationController {
         }
     }
 
-    public func cancelCurrent() {
-        cancelCurrentInternal()
+    public func cancelCurrent() async {
+        await cancelCurrentInternal()
     }
 
-    private func cancelCurrentInternal() {
+    private func cancelCurrentInternal() async {
         let hadActiveInvocation =
             currentInvocationID != nil ||
             currentTask != nil ||
@@ -142,9 +142,7 @@ public actor InvocationController {
 
         if let overlayHandle = currentOverlay {
             currentOverlay = nil
-            Task {
-                await overlayHandle.dismiss()
-            }
+            await overlayHandle.dismiss()
         }
 
         if hadActiveInvocation {
@@ -284,7 +282,10 @@ public actor InvocationController {
             await overlayHandle.applyRetranslation(translations, request: request)
         } catch is CancellationError {
             await overlayHandle.finishRetranslation()
+        } catch GlanslateError.cancelled {
+            await overlayHandle.finishRetranslation()
         } catch {
+            guard currentInvocationID == invocationID else { return }
             GlanslateLog.translate.error("Retranslation failed: \(error.localizedDescription, privacy: .public)")
             await overlayHandle.finishRetranslation()
             let toastError = await retranslationError(from: error, request: request)

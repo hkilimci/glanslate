@@ -32,6 +32,16 @@ struct OverlayLayoutEngine: Sendable {
         style: OverlayStyle,
         excludedRects: [CGRect] = []
     ) -> [OverlayRenderedBlock] {
+        if translations.count > 1,
+           let combined = renderedCombinedBlock(
+               translations: translations,
+               source: source,
+               style: style,
+               excludedRects: excludedRects
+           ) {
+            return [combined]
+        }
+
         var results: [OverlayRenderedBlock] = []
         var cumulativeExcluded = excludedRects
 
@@ -50,6 +60,51 @@ struct OverlayLayoutEngine: Sendable {
         return results
     }
 
+    static func renderedCombinedBlock(
+        translations: [GlanslateCore.Translation],
+        source: SourceVisualContext,
+        style: OverlayStyle,
+        excludedRects: [CGRect] = []
+    ) -> OverlayRenderedBlock? {
+        let ordered = translations.sortedForSequentialDisplay()
+        guard let first = ordered.first else { return nil }
+
+        let combinedText = ordered
+            .map { $0.translatedText.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        let sourceText = ordered
+            .map(\.block.text)
+            .joined(separator: "\n")
+
+        let combinedRegion = DisplayLocalRect(
+            displayID: first.block.region.displayID,
+            rect: combinedSourceRect(for: ordered, within: source.region.rect)
+        )
+        let combinedBlock = TextBlock(
+            id: first.block.id,
+            text: sourceText,
+            region: combinedRegion,
+            detectedLanguage: first.block.detectedLanguage,
+            confidence: first.block.confidence,
+            source: first.block.source
+        )
+        let combinedTranslation = GlanslateCore.Translation(
+            id: first.id,
+            block: combinedBlock,
+            translatedText: combinedText.isEmpty ? sourceText : combinedText,
+            targetLanguage: first.targetLanguage,
+            provider: first.provider
+        )
+
+        return renderedBlock(
+            for: combinedTranslation,
+            source: source,
+            style: style,
+            excludedRects: excludedRects
+        )
+    }
+
     static func renderedBlock(
         for translation: GlanslateCore.Translation,
         source: SourceVisualContext,
@@ -61,7 +116,8 @@ struct OverlayLayoutEngine: Sendable {
         let alignment: OverlayTextAlignment = translation.targetLanguage.isRightToLeft ? .trailing : .leading
         let direction: OverlayTextDirection = translation.targetLanguage.isRightToLeft ? .rightToLeft : .leftToRight
 
-        let minFontSize: CGFloat = style == .subtitle ? 12 : 14
+        let lineCount = max(1, translation.translatedText.split(whereSeparator: \.isNewline).count)
+        let minFontSize: CGFloat = style == .subtitle ? 12 : (lineCount > 1 ? 11 : 14)
         let maxFontSize: CGFloat = 28
         // Scale the font to the source line height (macshot's 0.65 ratio), kept within readable bounds.
         var fontSize = max(minFontSize, min(maxFontSize, original.height * 0.65))
@@ -251,5 +307,37 @@ struct OverlayLayoutEngine: Sendable {
         }
 
         return adjusted
+    }
+
+    private static func combinedSourceRect(
+        for translations: [GlanslateCore.Translation],
+        within bounds: CGRect
+    ) -> CGRect {
+        guard let first = translations.first else { return bounds }
+
+        let union = translations
+            .dropFirst()
+            .reduce(first.block.region.rect) { partial, translation in
+                partial.union(translation.block.region.rect)
+            }
+        let clamped = union.intersection(bounds)
+        if clamped.isNull || clamped.width <= 0 || clamped.height <= 0 {
+            return bounds
+        }
+        return clamped
+    }
+}
+
+private extension Array where Element == GlanslateCore.Translation {
+    func sortedForSequentialDisplay() -> [Element] {
+        sorted { lhs, rhs in
+            let left = lhs.block.region.rect
+            let right = rhs.block.region.rect
+
+            if abs(left.minY - right.minY) > 6 {
+                return left.minY < right.minY
+            }
+            return left.minX < right.minX
+        }
     }
 }

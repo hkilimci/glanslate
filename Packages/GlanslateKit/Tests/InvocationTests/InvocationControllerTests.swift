@@ -97,6 +97,74 @@ private actor RecordingTranslator: TranslationRouting {
     }
 }
 
+private actor SlowDismissingOverlayPresenter: OverlayPresenting {
+    private var lastHandle: OverlaySessionHandle?
+    private var presentationCount = 0
+    private var dismissalCount = 0
+
+    func present(_ session: OverlaySessionModel) async -> OverlaySessionHandle {
+        presentationCount += 1
+        let handle = OverlaySessionHandle(
+            onDismiss: { [weak self] _ in
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                await self?.recordDismissal()
+            }
+        )
+        lastHandle = handle
+        return handle
+    }
+
+    func dismissAll() async {
+        if let lastHandle {
+            await lastHandle.dismiss()
+        }
+    }
+
+    func currentDisplayID() async -> CGDirectDisplayID? {
+        nil
+    }
+
+    func latestHandle() -> OverlaySessionHandle? {
+        lastHandle
+    }
+
+    func hasDismissedOverlay() -> Bool {
+        dismissalCount > 0
+    }
+
+    func presentations() -> Int {
+        presentationCount
+    }
+
+    private func recordDismissal() {
+        dismissalCount += 1
+    }
+}
+
+private actor DismissAwareRegionSelector: RegionSelecting {
+    private let selection: RegionSelection
+    private let overlay: SlowDismissingOverlayPresenter
+    private var selectionCount = 0
+    private(set) var secondSelectionStartedBeforeDismiss = false
+
+    init(selection: RegionSelection, overlay: SlowDismissingOverlayPresenter) {
+        self.selection = selection
+        self.overlay = overlay
+    }
+
+    func selectRegion(in topology: DisplayTopologySnapshot) async -> RegionSelection? {
+        selectionCount += 1
+        if selectionCount == 2 {
+            secondSelectionStartedBeforeDismiss = !(await overlay.hasDismissedOverlay())
+        }
+        return selection
+    }
+
+    func didStartSecondSelectionBeforeDismiss() -> Bool {
+        secondSelectionStartedBeforeDismiss
+    }
+}
+
 private actor RecordingOverlayPresenter: OverlayPresenting {
     private var lastHandle: OverlaySessionHandle?
     private var lastAppliedTranslations: [GlanslateCore.Translation] = []
@@ -313,6 +381,37 @@ final class InvocationControllerTests: XCTestCase {
             if case .errored(.displayTopologyChanged) = $0 { return true }
             return false
         }))
+
+        await overlay.dismissAll()
+    }
+
+    @MainActor
+    func testStartWaitsForActiveOverlayDismissalBeforeSelectingAgain() async throws {
+        let overlay = SlowDismissingOverlayPresenter()
+        let selection = RegionSelection(region: sampleBlocks()[0].region, topology: sampleTopology())
+        let selector = DismissAwareRegionSelector(selection: selection, overlay: overlay)
+        let controller = InvocationController(
+            topology: StubTopology(snapshot: sampleTopology()),
+            regionSelect: selector,
+            capture: StubCapture(source: sampleSource()),
+            detect: StubDetector(blocks: sampleBlocks()),
+            translate: StubTranslator(translations: sampleTranslations()),
+            overlay: overlay,
+            history: try SwiftDataHistoryStore(inMemory: true),
+            settings: SettingsStore(
+                defaults: UserDefaults(suiteName: "InvocationRestart-\(UUID().uuidString)")!,
+                keychain: KeychainStore(service: "InvocationRestart-\(UUID().uuidString)")
+            )
+        )
+
+        await controller.start()
+        _ = await waitForPresentationCount(from: overlay, expectedCount: 1)
+
+        await controller.start()
+        _ = await waitForPresentationCount(from: overlay, expectedCount: 2)
+
+        let startedBeforeDismiss = await selector.didStartSecondSelectionBeforeDismiss()
+        XCTAssertFalse(startedBeforeDismiss)
 
         await overlay.dismissAll()
     }
@@ -555,5 +654,21 @@ final class InvocationControllerTests: XCTestCase {
         }
         XCTFail("Timed out waiting for applied translations")
         return await overlay.appliedTranslations()
+    }
+
+    @MainActor
+    private func waitForPresentationCount(
+        from overlay: SlowDismissingOverlayPresenter,
+        expectedCount: Int
+    ) async -> Int {
+        for _ in 0..<50 {
+            let count = await overlay.presentations()
+            if count >= expectedCount {
+                return count
+            }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTFail("Timed out waiting for overlay presentation count")
+        return await overlay.presentations()
     }
 }

@@ -86,6 +86,30 @@ final class OverlayLayoutEngineTests: XCTestCase {
         XCTAssertTrue(source.region.rect.contains(rendered.frame))
     }
 
+    func testMultipleTranslationsRenderAsOneSequentialBox() {
+        let source = sampleSource(region: CGRect(x: 0, y: 0, width: 420, height: 260))
+        let first = makeTranslation(
+            text: "First translated line",
+            blockRect: CGRect(x: 40, y: 44, width: 120, height: 22),
+            language: .en
+        )
+        let second = makeTranslation(
+            text: "Second translated line",
+            blockRect: CGRect(x: 38, y: 70, width: 128, height: 22),
+            language: .en
+        )
+
+        let rendered = OverlayLayoutEngine.renderedBlocks(
+            translations: [second, first],
+            source: source,
+            style: .cleanPatch
+        )
+
+        XCTAssertEqual(rendered.count, 1)
+        XCTAssertEqual(rendered[0].translation.translatedText, "First translated line\nSecond translated line")
+        XCTAssertTrue(source.region.rect.contains(rendered[0].frame))
+    }
+
     private func makeTranslation(
         text: String,
         blockRect: CGRect,

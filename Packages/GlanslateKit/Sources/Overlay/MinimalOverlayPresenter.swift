@@ -532,6 +532,7 @@ private struct CleanPatchBlockView: View {
             .font(.system(size: block.fontSize, weight: .semibold))
             .foregroundStyle(appearance.foregroundColor)
             .multilineTextAlignment(block.textAlignment.swiftUITextAlignment)
+            .lineLimit(nil)
             .frame(
                 width: max(block.frame.width - (block.horizontalPadding * 2), 24),
                 height: max(block.frame.height - (block.verticalPadding * 2), 18),
@@ -570,6 +571,7 @@ private struct BlurPatchBlockView: View {
                 .font(.system(size: block.fontSize, weight: .semibold))
                 .foregroundStyle(appearance.foregroundColor)
                 .multilineTextAlignment(block.textAlignment.swiftUITextAlignment)
+                .lineLimit(nil)
                 .frame(
                     width: max(block.frame.width - (block.horizontalPadding * 2), 24),
                     height: max(block.frame.height - (block.verticalPadding * 2), 18),
@@ -624,6 +626,7 @@ private struct SubtitleBlockView: View {
         Text(block.translation.translatedText)
             .font(.system(size: block.fontSize, weight: .bold))
             .multilineTextAlignment(block.textAlignment.swiftUITextAlignment)
+            .lineLimit(nil)
             .frame(
                 width: block.frame.width,
                 height: block.frame.height,
