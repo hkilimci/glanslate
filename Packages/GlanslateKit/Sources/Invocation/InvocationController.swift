@@ -392,11 +392,9 @@ final class AsyncStreamBroadcaster<Element: Sendable>: @unchecked Sendable {
 
     func yield(_ value: Element) {
         lock.lock()
+        defer { lock.unlock() }
         latest = value
-        let targets = Array(continuations.values)
-        lock.unlock()
-
-        for continuation in targets {
+        for continuation in continuations.values {
             continuation.yield(value)
         }
     }

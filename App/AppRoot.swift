@@ -22,7 +22,12 @@ final class AppRoot {
         do {
             self.historyStore = try SwiftDataHistoryStore()
         } catch {
-            self.historyStore = try! SwiftDataHistoryStore(inMemory: true)
+            GlanslateLog.history.error("Persistent history store failed to open: \(error.localizedDescription, privacy: .public). Falling back to in-memory store.")
+            do {
+                self.historyStore = try SwiftDataHistoryStore(inMemory: true)
+            } catch {
+                fatalError("Failed to initialize in-memory history store: \(error)")
+            }
         }
 
         let overlayPresenter = OverlayEngine(settings: settingsStore)
@@ -34,7 +39,12 @@ final class AppRoot {
                 .apple: AppleTranslationEngine.create(),
                 .deepL: DeepLEngine(keychain: keychain),
                 .google: GoogleEngine(http: HTTPClient(timeout: 10)),
-                .openAI: OpenAIEngine(keychain: keychain)
+                .openAI: OpenAIEngine(
+                    keychain: keychain,
+                    model: { [settingsStore] in
+                        await MainActor.run { settingsStore.openAIModel }
+                    }
+                )
             ],
             settings: settingsStore,
             keychain: keychain
