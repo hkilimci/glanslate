@@ -13,8 +13,13 @@ struct GlanslateApp: App {
         .menuBarExtraStyle(.menu)
 
         Settings {
-            SettingsSceneView(appRoot: appDelegate.appRoot)
-                .modelContainer(appDelegate.appRoot.historyStore.container)
+            let appRoot = appDelegate.appRoot
+            if let container = appRoot.historyContainer {
+                SettingsSceneView(appRoot: appRoot)
+                    .modelContainer(container)
+            } else {
+                SettingsSceneView(appRoot: appRoot)
+            }
         }
     }
 }

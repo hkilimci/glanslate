@@ -94,3 +94,11 @@ public final class SwiftDataHistoryStore: HistoryStoring {
         }
     }
 }
+
+@MainActor
+public final class NoopHistoryStore: HistoryStoring {
+    public init() {}
+    public func pin(_ translation: Translation, thumbnail: Data?) async throws {}
+    public func list() async throws -> [PinnedTranslation] { [] }
+    public func delete(_ id: UUID) async throws {}
+}
