@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftData
 import GlanslateKit
 
 extension Notification.Name {
@@ -10,7 +11,8 @@ extension Notification.Name {
 @Observable
 final class AppRoot {
     let settingsStore: SettingsStore
-    let historyStore: SwiftDataHistoryStore
+    let historyStore: any HistoryStoring
+    let historyContainer: ModelContainer?
     let overlayPresenter: OverlayEngine
     let invocationController: InvocationController
     let onboardingPresenter = OnboardingPresenter()
@@ -19,16 +21,9 @@ final class AppRoot {
         let settingsStore = SettingsStore()
         self.settingsStore = settingsStore
 
-        do {
-            self.historyStore = try SwiftDataHistoryStore()
-        } catch {
-            GlanslateLog.history.error("Persistent history store failed to open: \(error.localizedDescription, privacy: .public). Falling back to in-memory store.")
-            do {
-                self.historyStore = try SwiftDataHistoryStore(inMemory: true)
-            } catch {
-                fatalError("Failed to initialize in-memory history store: \(error)")
-            }
-        }
+        let (store, container) = Self.makeHistoryStore()
+        self.historyStore = store
+        self.historyContainer = container
 
         let overlayPresenter = OverlayEngine(settings: settingsStore)
         self.overlayPresenter = overlayPresenter
@@ -80,5 +75,21 @@ final class AppRoot {
 
     func updateDockIconVisibility() {
         NotificationCenter.default.post(name: .updateDockIconVisibility, object: nil)
+    }
+
+    private static func makeHistoryStore() -> (any HistoryStoring, ModelContainer?) {
+        do {
+            let store = try SwiftDataHistoryStore()
+            return (store, store.container)
+        } catch {
+            GlanslateLog.history.error("Persistent history store failed to open: \(error.localizedDescription, privacy: .public). Falling back to in-memory store.")
+        }
+        do {
+            let store = try SwiftDataHistoryStore(inMemory: true)
+            return (store, store.container)
+        } catch {
+            GlanslateLog.history.error("In-memory history store failed to open: \(error.localizedDescription, privacy: .public). History will be disabled this session.")
+            return (NoopHistoryStore(), nil)
+        }
     }
 }
