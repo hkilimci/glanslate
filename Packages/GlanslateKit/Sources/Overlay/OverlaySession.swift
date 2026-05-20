@@ -63,6 +63,7 @@ public enum OverlayEvent: Sendable, Hashable {
     case dismissed
     case peekBegan
     case peekEnded
+    case copied
 }
 
 public actor OverlaySessionHandle {
@@ -75,6 +76,7 @@ public actor OverlaySessionHandle {
     private let onSetStyle: @Sendable (OverlayStyle) async -> Void
     private let onBeginPeek: @Sendable () async -> Void
     private let onEndPeek: @Sendable () async -> Void
+    private let onCopy: @Sendable () async -> Void
     private let onDismiss: @Sendable (UUID) async -> Void
     private let eventStream: AsyncStream<OverlayEvent>
     private let continuation: AsyncStream<OverlayEvent>.Continuation
@@ -100,6 +102,7 @@ public actor OverlaySessionHandle {
         onSetStyle: @escaping @Sendable (OverlayStyle) async -> Void = { _ in },
         onBeginPeek: @escaping @Sendable () async -> Void = {},
         onEndPeek: @escaping @Sendable () async -> Void = {},
+        onCopy: @escaping @Sendable () async -> Void = {},
         onDismiss: @escaping @Sendable (UUID) async -> Void = { _ in }
     ) {
         self.sessionID = sessionID
@@ -111,6 +114,7 @@ public actor OverlaySessionHandle {
         self.onSetStyle = onSetStyle
         self.onBeginPeek = onBeginPeek
         self.onEndPeek = onEndPeek
+        self.onCopy = onCopy
         self.onDismiss = onDismiss
         var localContinuation: AsyncStream<OverlayEvent>.Continuation?
         self.eventStream = AsyncStream<OverlayEvent> { continuation in
@@ -196,6 +200,12 @@ public actor OverlaySessionHandle {
             await onBeginPeek()
             continuation.yield(.peekBegan)
         }
+    }
+
+    public func copy() async {
+        guard !isDismissed else { return }
+        await onCopy()
+        continuation.yield(.copied)
     }
 
     public func dismiss() async {

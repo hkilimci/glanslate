@@ -241,7 +241,7 @@ public actor InvocationController {
             break
         case .retranslateRequested(let request):
             scheduleRetranslation(request, invocationID: invocationID)
-        case .peekBegan, .peekEnded:
+        case .peekBegan, .peekEnded, .copied:
             break
         }
     }

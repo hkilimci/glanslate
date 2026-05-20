@@ -60,6 +60,7 @@ struct OverlayToolbarView: View {
     let peekAction: () -> Void
     let styleAction: (OverlayStyle) -> Void
     let retranslateAction: (OverlayRetranslationRequest) -> Void
+    let copyAction: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -77,6 +78,13 @@ struct OverlayToolbarView: View {
                 action: pinAction
             )
             .help(viewModel.isPinned ? "Unpin from History" : "Pin to History")
+
+            toolbarIconButton(
+                systemName: "doc.on.doc",
+                foreground: .primary,
+                action: copyAction
+            )
+            .help("Copy Translation")
 
             Button(action: peekAction) {
                 Label(

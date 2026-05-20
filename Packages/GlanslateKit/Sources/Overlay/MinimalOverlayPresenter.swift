@@ -71,6 +71,11 @@ public actor OverlayEngine: OverlayPresenting {
                     presentation.setPeeking(false)
                 }
             },
+            onCopy: {
+                await MainActor.run {
+                    presentation.copyToPasteboard()
+                }
+            },
             onDismiss: { [weak self] closedID in
                 await self?.dismissSession(id: closedID)
             }
@@ -289,6 +294,12 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
         viewModel.isRetranslating = false
     }
 
+    func copyToPasteboard() {
+        let text = viewModel.translations.map(\.translatedText).joined(separator: "\n")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
     func setStyleOverride(_ style: OverlayStyle) {
         viewModel.styleOverride = style
     }
@@ -402,6 +413,11 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
             retranslateAction: { request in
                 Task {
                     await handle.requestRetranslation(request)
+                }
+            },
+            copyAction: {
+                Task {
+                    await handle.copy()
                 }
             }
         ))

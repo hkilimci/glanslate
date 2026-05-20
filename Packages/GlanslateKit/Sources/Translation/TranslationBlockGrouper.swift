@@ -80,10 +80,29 @@ public struct TranslationBlockGrouper: Sendable {
 
         let displayID = blocks[0].region.displayID
         let rect = unionRect(for: blocks)
-        let text = blocks
-            .map { normalizedLine($0.text) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+        let medianHeight = medianLineHeight(in: blocks)
+        let paragraphGapThreshold = medianHeight * 1.3
+
+        var parts: [String] = [normalizedLine(blocks[0].text)]
+
+        for i in 1..<blocks.count {
+            let prev = blocks[i - 1]
+            let curr = blocks[i]
+            let prevText = normalizedLine(prev.text)
+            let currText = normalizedLine(curr.text)
+
+            let verticalGap = curr.region.rect.minY - prev.region.rect.maxY
+            let isParagraphGap = verticalGap > paragraphGapThreshold
+
+            let endsSentence = ".!?".contains(prevText.last ?? Character(""))
+            let startsCapital = currText.first?.isUppercase ?? false
+            let isNewSentence = endsSentence && startsCapital
+
+            let separator = (isParagraphGap || isNewSentence) ? "\n" : " "
+            parts.append(separator + currText)
+        }
+
+        let text = parts.joined()
 
         return TextBlock(
             text: text,

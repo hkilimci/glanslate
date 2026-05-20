@@ -17,7 +17,7 @@ final class TranslationBlockGrouperTests: XCTestCase {
         XCTAssertEqual(grouped.count, 2)
         XCTAssertEqual(
             grouped[0].text,
-            "Thanks for your comment. You have a point. I would also behave like you in terms of security. It is an open-source app so you can check the code."
+            "Thanks for your comment. You have a point.\nI would also behave like you in terms of security.\nIt is an open-source app so you can check the code."
         )
         XCTAssertEqual(grouped[0].region.rect, CGRect(x: 10, y: 0, width: 300, height: 44))
         XCTAssertEqual(grouped[1].text, "You can also fork the project.")

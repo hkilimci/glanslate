@@ -67,9 +67,11 @@ struct OverlayLayoutEngine: Sendable {
             original.insetBy(dx: -metrics.outerPadding, dy: -metrics.outerPadding),
             within: bounds
         )
+        let lineCount = max(translation.translatedText.components(separatedBy: "\n").count, 1)
+        let lineHeight = original.height / CGFloat(lineCount)
         let initialFontSize = max(
             metrics.minFontSize,
-            min(metrics.maxFontSize, original.height * 0.65)
+            min(metrics.maxFontSize, lineHeight * 0.65)
         )
         let fitted = fittedFrame(
             text: translation.translatedText,

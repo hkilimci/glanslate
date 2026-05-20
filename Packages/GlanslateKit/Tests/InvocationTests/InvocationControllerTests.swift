@@ -368,7 +368,7 @@ final class InvocationControllerTests: XCTestCase {
         XCTAssertEqual(translatedBlocks.count, 1)
         XCTAssertEqual(
             translatedBlocks[0].text,
-            "Thanks for your comment. You have a point. I would also behave like you in terms of security. It is an open-source app."
+            "Thanks for your comment. You have a point.\nI would also behave like you in terms of security.\nIt is an open-source app."
         )
         XCTAssertEqual(translatedBlocks[0].region.rect, CGRect(x: 10, y: 10, width: 72, height: 44))
 
