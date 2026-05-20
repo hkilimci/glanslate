@@ -27,29 +27,35 @@ final class AppleTranslationSessionBridge: ObservableObject {
         to: Language,
         needsDownload: Bool
     ) async throws -> [GlanslateCore.Translation] {
-        guard currentJob == nil else {
-            throw GlanslateError.translation(
-                provider: .apple,
-                reason: "Another Apple Translation request is already in progress."
-            )
+        // If a previous request was abandoned (e.g. task cancelled before finish()),
+        // clean it up so the new request can proceed instead of being rejected.
+        if let existing = currentJob {
+            finish(jobID: existing.id, result: .failure(CancellationError()))
         }
 
         ensureWindow()
         presentHostWindow()
 
-        return try await withCheckedThrowingContinuation { continuation in
-            currentJob = Job(
-                id: UUID(),
-                blocks: blocks,
-                sourceLanguage: from,
-                targetLanguage: to,
-                needsDownload: needsDownload,
-                continuation: continuation
-            )
-            configuration = TranslationSession.Configuration(
-                source: from.map { Locale.Language(identifier: $0.bcp47) },
-                target: Locale.Language(identifier: to.bcp47)
-            )
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                currentJob = Job(
+                    id: UUID(),
+                    blocks: blocks,
+                    sourceLanguage: from,
+                    targetLanguage: to,
+                    needsDownload: needsDownload,
+                    continuation: continuation
+                )
+                configuration = TranslationSession.Configuration(
+                    source: from.map { Locale.Language(identifier: $0.bcp47) },
+                    target: Locale.Language(identifier: to.bcp47)
+                )
+            }
+        } onCancel: { [weak self] in
+            guard let self else { return }
+            if let job = self.currentJob {
+                self.finish(jobID: job.id, result: .failure(CancellationError()))
+            }
         }
     }
 
