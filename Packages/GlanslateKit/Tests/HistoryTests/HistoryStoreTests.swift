@@ -29,4 +29,40 @@ final class HistoryStoreTests: XCTestCase {
         let remaining = try await store.list()
         XCTAssertTrue(remaining.isEmpty)
     }
+
+    @MainActor
+    func testDeleteAllClearsPinnedTranslations() async throws {
+        let store = try SwiftDataHistoryStore(inMemory: true)
+        let translations = [
+            translation(id: UUID(), source: "hello", translated: "merhaba"),
+            translation(id: UUID(), source: "world", translated: "dunya"),
+        ]
+
+        for translation in translations {
+            try await store.pin(translation, thumbnail: nil)
+        }
+        let pinned = try await store.list()
+        XCTAssertEqual(pinned.count, 2)
+
+        try await store.deleteAll()
+
+        let remaining = try await store.list()
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
+    private func translation(id: UUID, source: String, translated: String) -> GlanslateCore.Translation {
+        GlanslateCore.Translation(
+            id: id,
+            block: TextBlock(
+                text: source,
+                region: DisplayLocalRect(displayID: 1, rect: CGRect(x: 0, y: 0, width: 10, height: 10)),
+                detectedLanguage: .en,
+                confidence: 1,
+                source: .vision
+            ),
+            translatedText: translated,
+            targetLanguage: .tr,
+            provider: .openAI
+        )
+    }
 }

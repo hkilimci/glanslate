@@ -57,6 +57,7 @@ struct OverlayToolbarView: View {
     let settings: SettingsStore
     let dismissAction: () -> Void
     let pinAction: () -> Void
+    let peekAction: () -> Void
     let styleAction: (OverlayStyle) -> Void
     let retranslateAction: (OverlayRetranslationRequest) -> Void
 
@@ -75,15 +76,29 @@ struct OverlayToolbarView: View {
                 backgroundOpacity: viewModel.isPinned ? 0.18 : 0.12,
                 action: pinAction
             )
-            .help(viewModel.isPinned ? "Pinned to History" : "Pin to History")
+            .help(viewModel.isPinned ? "Unpin from History" : "Pin to History")
 
-            Label(
-                settings.peekModifier.displayName,
-                systemImage: viewModel.isPeeking ? "eye.fill" : "eye"
-            )
-            .font(.caption.weight(.medium))
-            .foregroundStyle(viewModel.isPeeking ? Color.primary : Color.secondary)
-            .lineLimit(1)
+            Button(action: peekAction) {
+                Label(
+                    settings.peekModifier.displayName,
+                    systemImage: viewModel.isPeeking ? "eye.fill" : "eye"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(viewModel.isPeeking ? Color.accentColor : Color.primary)
+                .lineLimit(1)
+                .padding(.horizontal, 9)
+                .frame(height: 30)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(viewModel.isPeeking ? 0.18 : 0.12))
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(viewModel.isPeeking ? 0.32 : 0.14), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .help(viewModel.isPeeking ? "Show Translation" : "Show Original Text")
 
             Divider()
 
@@ -173,7 +188,7 @@ struct OverlayToolbarView: View {
                     }
                 )
             ) {
-                Image(systemName: "rectangle.fill").tag(OverlayStyle.cleanPatch)
+                Image(systemName: "sparkles").tag(OverlayStyle.cleanPatch)
                 Image(systemName: "drop.fill").tag(OverlayStyle.blurPatch)
                 Image(systemName: "captions.bubble.fill").tag(OverlayStyle.subtitle)
             }

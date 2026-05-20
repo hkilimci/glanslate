@@ -68,7 +68,8 @@ let package = Package(
                 "GlanslateCore", "GlanslateGeometry", "GlanslateCapture",
                 "GlanslateTranslation", "GlanslateSettings", "GlanslateHistory",
             ],
-            path: "Sources/Overlay"
+            path: "Sources/Overlay",
+            resources: [.process("Resources")]
         ),
         .target(
             name: "GlanslateInvocation",

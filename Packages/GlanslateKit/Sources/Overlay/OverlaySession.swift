@@ -59,6 +59,7 @@ public enum OverlayEvent: Sendable, Hashable {
     case styleChanged(OverlayStyle)
     case retranslateRequested(OverlayRetranslationRequest)
     case pinned(OverlayPinnedPayload)
+    case unpinned(OverlayPinnedPayload)
     case dismissed
     case peekBegan
     case peekEnded
@@ -67,6 +68,7 @@ public enum OverlayEvent: Sendable, Hashable {
 public actor OverlaySessionHandle {
     public nonisolated let sessionID: UUID
     private let onPin: @Sendable () async -> OverlayPinnedPayload
+    private let onUnpin: @Sendable () async -> OverlayPinnedPayload
     private let onRetranslateRequested: @Sendable (OverlayRetranslationRequest) async -> Void
     private let onApplyRetranslation: @Sendable ([Translation], OverlayRetranslationRequest) async -> Void
     private let onFinishRetranslation: @Sendable () async -> Void
@@ -78,6 +80,7 @@ public actor OverlaySessionHandle {
     private let continuation: AsyncStream<OverlayEvent>.Continuation
     private var isDismissed = false
     private var isPinned = false
+    private var isPeeking = false
 
     public nonisolated var events: AsyncStream<OverlayEvent> {
         eventStream
@@ -86,6 +89,9 @@ public actor OverlaySessionHandle {
     public init(
         sessionID: UUID = UUID(),
         onPin: @escaping @Sendable () async -> OverlayPinnedPayload = {
+            OverlayPinnedPayload(translations: [], thumbnailPNG: nil)
+        },
+        onUnpin: @escaping @Sendable () async -> OverlayPinnedPayload = {
             OverlayPinnedPayload(translations: [], thumbnailPNG: nil)
         },
         onRetranslateRequested: @escaping @Sendable (OverlayRetranslationRequest) async -> Void = { _ in },
@@ -98,6 +104,7 @@ public actor OverlaySessionHandle {
     ) {
         self.sessionID = sessionID
         self.onPin = onPin
+        self.onUnpin = onUnpin
         self.onRetranslateRequested = onRetranslateRequested
         self.onApplyRetranslation = onApplyRetranslation
         self.onFinishRetranslation = onFinishRetranslation
@@ -117,6 +124,26 @@ public actor OverlaySessionHandle {
         isPinned = true
         let payload = await onPin()
         continuation.yield(.pinned(payload))
+    }
+
+    public func unpin() async {
+        guard !isDismissed, isPinned else { return }
+        isPinned = false
+        let payload = await onUnpin()
+        continuation.yield(.unpinned(payload))
+    }
+
+    public func togglePin() async {
+        guard !isDismissed else { return }
+        if isPinned {
+            isPinned = false
+            let payload = await onUnpin()
+            continuation.yield(.unpinned(payload))
+        } else {
+            isPinned = true
+            let payload = await onPin()
+            continuation.yield(.pinned(payload))
+        }
     }
 
     public func requestRetranslation(_ request: OverlayRetranslationRequest) async {
@@ -145,15 +172,30 @@ public actor OverlaySessionHandle {
     }
 
     public func beginPeek() async {
-        guard !isDismissed else { return }
+        guard !isDismissed, !isPeeking else { return }
+        isPeeking = true
         await onBeginPeek()
         continuation.yield(.peekBegan)
     }
 
     public func endPeek() async {
-        guard !isDismissed else { return }
+        guard !isDismissed, isPeeking else { return }
+        isPeeking = false
         await onEndPeek()
         continuation.yield(.peekEnded)
+    }
+
+    public func togglePeek() async {
+        guard !isDismissed else { return }
+        if isPeeking {
+            isPeeking = false
+            await onEndPeek()
+            continuation.yield(.peekEnded)
+        } else {
+            isPeeking = true
+            await onBeginPeek()
+            continuation.yield(.peekBegan)
+        }
     }
 
     public func dismiss() async {
@@ -175,6 +217,12 @@ public actor NoopOverlayPresenter: OverlayPresenting {
         let handle = OverlaySessionHandle(
             sessionID: sessionID,
             onPin: {
+                OverlayPinnedPayload(
+                    translations: session.translations,
+                    thumbnailPNG: nil
+                )
+            },
+            onUnpin: {
                 OverlayPinnedPayload(
                     translations: session.translations,
                     thumbnailPNG: nil

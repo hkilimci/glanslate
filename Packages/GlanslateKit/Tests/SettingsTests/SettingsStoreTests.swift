@@ -14,6 +14,8 @@ final class SettingsStoreTests: XCTestCase {
         store.preferredProvider = .google
         store.defaultTargetLanguage = .fr
         store.overlayStyle = .subtitle
+        store.subtitleShowBackground = true
+        store.subtitleBackgroundColorHex = "#123456"
         store.acceptDisclosure(for: .google)
         store.persist()
 
@@ -21,6 +23,8 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.preferredProvider, .google)
         XCTAssertEqual(reloaded.defaultTargetLanguage, .fr)
         XCTAssertEqual(reloaded.overlayStyle, .subtitle)
+        XCTAssertTrue(reloaded.subtitleShowBackground)
+        XCTAssertEqual(reloaded.subtitleBackgroundColorHex, "#123456")
         XCTAssertTrue(reloaded.hasAcceptedDisclosure(for: .google))
     }
 }

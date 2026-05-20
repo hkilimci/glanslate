@@ -32,6 +32,7 @@ final class OverlaySessionTests: XCTestCase {
             )
         )
         await handle.pin()
+        await handle.unpin()
         await handle.dismiss()
 
         let output = await collector.value
@@ -48,6 +49,12 @@ final class OverlaySessionTests: XCTestCase {
                     )
                 ),
                 .pinned(
+                    OverlayPinnedPayload(
+                        translations: session.translations,
+                        thumbnailPNG: nil
+                    )
+                ),
+                .unpinned(
                     OverlayPinnedPayload(
                         translations: session.translations,
                         thumbnailPNG: nil

@@ -28,6 +28,30 @@ private func persistedBinding<Value: Sendable>(
     )
 }
 
+@MainActor
+private func hexColorBinding(
+    settings: SettingsStore,
+    _ keyPath: ReferenceWritableKeyPath<SettingsStore, String>,
+    fallback: String
+) -> Binding<Color> {
+    let box = SendableKeyPath(keyPath: keyPath)
+    return Binding(
+        get: {
+            MainActor.assumeIsolated {
+                Color(hex: settings[keyPath: box.keyPath])
+                    ?? Color(hex: fallback)
+                    ?? .white
+            }
+        },
+        set: { newValue in
+            MainActor.assumeIsolated {
+                settings[keyPath: box.keyPath] = newValue.rgbHexString ?? fallback
+                settings.persist()
+            }
+        }
+    )
+}
+
 struct SettingsSceneView: View {
     let appRoot: AppRoot
 
@@ -178,18 +202,52 @@ private struct OverlaySettingsTab: View {
                 }
             }
 
-            Section("Subtitle") {
-                Toggle("Show Hairline Border", isOn: persistedBinding(settings: settings, \.subtitleShowBorder))
+            if settings.overlayStyle == .subtitle {
+                Section("Subtitle") {
+                    Toggle("Show Background", isOn: persistedBinding(settings: settings, \.subtitleShowBackground))
 
-                TextField(
-                    "Text Color (#RRGGBB)",
-                    text: persistedBinding(settings: settings, \.subtitleTextColorHex)
-                )
+                    if settings.subtitleShowBackground {
+                        ColorPicker(
+                            "Background Color",
+                            selection: hexColorBinding(
+                                settings: settings,
+                                \.subtitleBackgroundColorHex,
+                                fallback: "#000000"
+                            ),
+                            supportsOpacity: false
+                        )
+                    }
 
-                TextField(
-                    "Outline Color (#RRGGBB)",
-                    text: persistedBinding(settings: settings, \.subtitleOutlineColorHex)
-                )
+                    Toggle("Show Hairline Border", isOn: persistedBinding(settings: settings, \.subtitleShowBorder))
+
+                    ColorPicker(
+                        "Text Color",
+                        selection: hexColorBinding(
+                            settings: settings,
+                            \.subtitleTextColorHex,
+                            fallback: "#FFFFFF"
+                        ),
+                        supportsOpacity: false
+                    )
+
+                    ColorPicker(
+                        "Outline Color",
+                        selection: hexColorBinding(
+                            settings: settings,
+                            \.subtitleOutlineColorHex,
+                            fallback: "#000000"
+                        ),
+                        supportsOpacity: false
+                    )
+
+                    SubtitlePreviewView(
+                        textColor: Color(hex: settings.subtitleTextColorHex) ?? .white,
+                        outlineColor: Color(hex: settings.subtitleOutlineColorHex) ?? .black,
+                        backgroundColor: Color(hex: settings.subtitleBackgroundColorHex) ?? .black,
+                        showsBackground: settings.subtitleShowBackground,
+                        showsBorder: settings.subtitleShowBorder
+                    )
+                }
             }
         }
         .formStyle(.grouped)
@@ -197,9 +255,88 @@ private struct OverlaySettingsTab: View {
     }
 }
 
+private struct SubtitlePreviewView: View {
+    let textColor: Color
+    let outlineColor: Color
+    let backgroundColor: Color
+    let showsBackground: Bool
+    let showsBorder: Bool
+
+    private let outlineOffsets: [CGSize] = [
+        CGSize(width: -1, height: 0),
+        CGSize(width: 1, height: 0),
+        CGSize(width: 0, height: -1),
+        CGSize(width: 0, height: 1),
+    ]
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.black.opacity(0.86))
+
+            if showsBackground {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(backgroundColor.opacity(0.58))
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 14)
+            }
+
+            if showsBorder {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(outlineColor.opacity(0.26), lineWidth: 1)
+                    .padding(.horizontal, showsBackground ? 22 : 0)
+                    .padding(.vertical, showsBackground ? 14 : 0)
+            }
+
+            ZStack {
+                ForEach(Array(outlineOffsets.enumerated()), id: \.offset) { _, offset in
+                    previewText
+                        .foregroundStyle(outlineColor)
+                        .offset(offset)
+                }
+                previewText
+                    .foregroundStyle(textColor)
+            }
+            .shadow(color: .black.opacity(0.7), radius: 2, y: 1)
+            .padding(.horizontal, 14)
+        }
+        .frame(height: 74)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var previewText: some View {
+        Text("Thanks for your comment.")
+            .font(.system(size: 22, weight: .bold))
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .minimumScaleFactor(0.72)
+    }
+}
+
+private extension Color {
+    init?(hex: String) {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        guard cleaned.count == 6, let value = Int(cleaned, radix: 16) else { return nil }
+
+        let red = Double((value >> 16) & 0xFF) / 255.0
+        let green = Double((value >> 8) & 0xFF) / 255.0
+        let blue = Double(value & 0xFF) / 255.0
+        self = Color(red: red, green: green, blue: blue)
+    }
+
+    var rgbHexString: String? {
+        guard let color = NSColor(self).usingColorSpace(.sRGB) else { return nil }
+        let red = max(0, min(255, Int(round(color.redComponent * 255))))
+        let green = max(0, min(255, Int(round(color.greenComponent * 255))))
+        let blue = max(0, min(255, Int(round(color.blueComponent * 255))))
+        return String(format: "#%02X%02X%02X", red, green, blue)
+    }
+}
+
 private struct HistorySettingsTab: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \PinnedTranslation.createdAt, order: .reverse) private var items: [PinnedTranslation]
+    @State private var isConfirmingClearHistory = false
 
     var body: some View {
         Group {
@@ -215,22 +352,59 @@ private struct HistorySettingsTab: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 14) {
-                        ForEach(items) { item in
-                            HistoryCard(item: item) {
-                                delete(item)
+                VStack(spacing: 0) {
+                    HStack {
+                        Text("Pinned Translations")
+                            .font(.headline)
+
+                        Spacer()
+
+                        Button(role: .destructive) {
+                            isConfirmingClearHistory = true
+                        } label: {
+                            Label("Clear History", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 8)
+
+                    ScrollView {
+                        LazyVStack(spacing: 14) {
+                            ForEach(items) { item in
+                                HistoryCard(item: item) {
+                                    delete(item)
+                                }
                             }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
                     }
-                    .padding(20)
                 }
             }
+        }
+        .confirmationDialog(
+            "Clear all pinned translations?",
+            isPresented: $isConfirmingClearHistory,
+            titleVisibility: .visible
+        ) {
+            Button("Clear History", role: .destructive) {
+                clearHistory()
+            }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
     private func delete(_ item: PinnedTranslation) {
         modelContext.delete(item)
+        try? modelContext.save()
+    }
+
+    private func clearHistory() {
+        for item in Array(items) {
+            modelContext.delete(item)
+        }
         try? modelContext.save()
     }
 }

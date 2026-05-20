@@ -7,7 +7,7 @@ public enum OverlayStyle: String, Sendable, Codable, Hashable, CaseIterable {
 
     public var displayName: String {
         switch self {
-        case .cleanPatch: return "Clean Patch"
+        case .cleanPatch: return "Liquid Glass"
         case .blurPatch: return "Blur Patch"
         case .subtitle: return "Subtitle"
         }

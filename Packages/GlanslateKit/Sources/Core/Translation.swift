@@ -10,12 +10,20 @@ public enum TranslationProvider: String, Sendable, Codable, Hashable, CaseIterab
         switch self {
         case .apple: return "Apple Translation"
         case .deepL: return "DeepL"
-        case .google: return "Google Cloud Translation"
+        case .google: return "Google Translate"
         case .openAI: return "OpenAI"
         }
     }
 
-    public var requiresAPIKey: Bool { self != .apple }
+    public var requiresAPIKey: Bool {
+        switch self {
+        case .deepL, .openAI:
+            return true
+        case .apple, .google:
+            return false
+        }
+    }
+
     public var sendsTextOffDevice: Bool { self != .apple }
 }
 

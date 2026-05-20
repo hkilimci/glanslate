@@ -30,6 +30,8 @@ public final class SettingsStore {
     public var overlayStyle: OverlayStyle
     public var overlayOpacity: Double
     public var peekModifier: PeekModifier
+    public var subtitleShowBackground: Bool
+    public var subtitleBackgroundColorHex: String
     public var subtitleShowBorder: Bool
     public var subtitleTextColorHex: String          // #RRGGBB
     public var subtitleOutlineColorHex: String
@@ -53,6 +55,8 @@ public final class SettingsStore {
         self.overlayStyle = defaults.decode("overlayStyle", default: .cleanPatch)
         self.overlayOpacity = defaults.object(forKey: "overlayOpacity") as? Double ?? 1.0
         self.peekModifier = defaults.decode("peekModifier", default: .option)
+        self.subtitleShowBackground = defaults.object(forKey: "subtitleShowBackground") as? Bool ?? true
+        self.subtitleBackgroundColorHex = defaults.string(forKey: "subtitleBackgroundColorHex") ?? "#000000"
         self.subtitleShowBorder = defaults.object(forKey: "subtitleShowBorder") as? Bool ?? false
         self.subtitleTextColorHex = defaults.string(forKey: "subtitleTextColorHex") ?? "#FFFFFF"
         self.subtitleOutlineColorHex = defaults.string(forKey: "subtitleOutlineColorHex") ?? "#000000"
@@ -68,6 +72,8 @@ public final class SettingsStore {
         defaults.encode(overlayStyle, key: "overlayStyle")
         defaults.set(overlayOpacity, forKey: "overlayOpacity")
         defaults.encode(peekModifier, key: "peekModifier")
+        defaults.set(subtitleShowBackground, forKey: "subtitleShowBackground")
+        defaults.set(subtitleBackgroundColorHex, forKey: "subtitleBackgroundColorHex")
         defaults.set(subtitleShowBorder, forKey: "subtitleShowBorder")
         defaults.set(subtitleTextColorHex, forKey: "subtitleTextColorHex")
         defaults.set(subtitleOutlineColorHex, forKey: "subtitleOutlineColorHex")

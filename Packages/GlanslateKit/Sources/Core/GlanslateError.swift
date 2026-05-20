@@ -35,7 +35,7 @@ public enum GlanslateError: Error, Sendable, Equatable, Hashable {
         case .displayTopologyChanged:
             return "Display arrangement changed — please retry."
         case .disclosureNotAccepted(let provider):
-            return "Cloud provider \(provider.displayName) requires explicit disclosure acceptance."
+            return "\(provider.displayName) sends recognized text off this Mac. Accept it in Settings → Translation → Cloud Disclosure."
         case .cancelled:
             return "Translation cancelled."
         }

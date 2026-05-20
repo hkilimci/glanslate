@@ -18,6 +18,7 @@ final class AppleTranslationSessionBridge: ObservableObject {
     private var window: NSWindow?
     private var currentJob: Job?
     private var runningJobID: UUID?
+    private var timeoutTask: Task<Void, Never>?
 
     private init() {}
 
@@ -33,13 +34,15 @@ final class AppleTranslationSessionBridge: ObservableObject {
             finish(jobID: existing.id, result: .failure(CancellationError()))
         }
 
+        resetHostWindow()
         ensureWindow()
         presentHostWindow()
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
+                let jobID = UUID()
                 currentJob = Job(
-                    id: UUID(),
+                    id: jobID,
                     blocks: blocks,
                     sourceLanguage: from,
                     targetLanguage: to,
@@ -50,6 +53,7 @@ final class AppleTranslationSessionBridge: ObservableObject {
                     source: from.map { Locale.Language(identifier: $0.bcp47) },
                     target: Locale.Language(identifier: to.bcp47)
                 )
+                scheduleTimeout(for: jobID)
             }
         } onCancel: { [weak self] in
             guard let self else { return }
@@ -102,6 +106,13 @@ final class AppleTranslationSessionBridge: ObservableObject {
         self.window = window
     }
 
+    private func resetHostWindow() {
+        configuration = nil
+        window?.orderOut(nil)
+        window?.close()
+        window = nil
+    }
+
     private func presentHostWindow() {
         guard let window else { return }
         window.center()
@@ -109,15 +120,31 @@ final class AppleTranslationSessionBridge: ObservableObject {
         window.orderFrontRegardless()
     }
 
+    private func scheduleTimeout(for jobID: UUID) {
+        timeoutTask?.cancel()
+        timeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.finish(
+                jobID: jobID,
+                result: .failure(GlanslateError.translation(
+                    provider: .apple,
+                    reason: "Apple Translation timed out. Retry after installing the required language models or use a cloud provider."
+                ))
+            )
+        }
+    }
+
     fileprivate func finish(
         jobID: UUID,
         result: Result<[GlanslateCore.Translation], Error>
     ) {
         guard let job = currentJob, job.id == jobID else { return }
+        timeoutTask?.cancel()
+        timeoutTask = nil
         runningJobID = nil
         currentJob = nil
-        configuration = nil
-        window?.orderOut(nil)
+        resetHostWindow()
         job.continuation.resume(with: result)
     }
 }

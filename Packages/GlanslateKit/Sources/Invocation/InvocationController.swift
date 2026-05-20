@@ -168,11 +168,12 @@ public actor InvocationController {
             try verifyTopologyUnchanged(expected: snapshot, invocationID: id)
             stateBroadcaster.yield(.detecting)
             let blocks = try await detect.detect(source)
+            let translationBlocks = TranslationBlockGrouper.groupedForContext(blocks)
 
             try verifyTopologyUnchanged(expected: snapshot, invocationID: id)
             stateBroadcaster.yield(.translating)
             let targetLanguage = await MainActor.run { settings.defaultTargetLanguage }
-            let translations = try await translate.translate(blocks, to: targetLanguage, invocationOverride: nil)
+            let translations = try await translate.translate(translationBlocks, to: targetLanguage, invocationOverride: nil)
 
             try verifyTopologyUnchanged(expected: snapshot, invocationID: id)
             let session = OverlaySessionModel(
@@ -189,7 +190,7 @@ public actor InvocationController {
 
             currentOverlay = handle
             currentOverlayContext = ActiveOverlayContext(
-                blocks: blocks,
+                blocks: translationBlocks,
                 translations: translations,
                 currentRequest: OverlayRetranslationRequest(targetLanguage: targetLanguage)
             )
@@ -234,6 +235,8 @@ public actor InvocationController {
             } catch {
                 GlanslateLog.history.error("Failed to pin translation history: \(error.localizedDescription, privacy: .public)")
             }
+        case .unpinned:
+            break
         case .styleChanged:
             break
         case .retranslateRequested(let request):

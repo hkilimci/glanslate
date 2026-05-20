@@ -36,6 +36,11 @@ public actor OverlayEngine: OverlayPresenting {
                     presentation.pinAndCreatePayload()
                 }
             },
+            onUnpin: {
+                await MainActor.run {
+                    presentation.unpinAndCreatePayload()
+                }
+            },
             onRetranslateRequested: { request in
                 await MainActor.run {
                     presentation.prepareForRetranslation(request)
@@ -177,6 +182,7 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
     private weak var handle: OverlaySessionHandle?
     private var keyMonitor: Any?
     private var flagsMonitor: Any?
+    private var globalFlagsMonitor: Any?
     private var screenParameterObserver: NSObjectProtocol?
     private var hoverTimer: Timer?
     private var hoverState = OverlayToolbarHoverState()
@@ -224,6 +230,10 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
             NSEvent.removeMonitor(flagsMonitor)
             self.flagsMonitor = nil
         }
+        if let globalFlagsMonitor {
+            NSEvent.removeMonitor(globalFlagsMonitor)
+            self.globalFlagsMonitor = nil
+        }
         if let screenParameterObserver {
             NotificationCenter.default.removeObserver(screenParameterObserver)
             self.screenParameterObserver = nil
@@ -252,6 +262,14 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
             viewModel.retainedSource = retainedSource
         }
         return rendered.payload
+    }
+
+    func unpinAndCreatePayload() -> OverlayPinnedPayload {
+        viewModel.isPinned = false
+        return OverlayPinnedPayload(
+            translations: viewModel.translations,
+            thumbnailPNG: nil
+        )
     }
 
     func prepareForRetranslation(_ request: OverlayRetranslationRequest) {
@@ -294,7 +312,7 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             if flags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "p" {
                 Task {
-                    await handle.pin()
+                    await handle.togglePin()
                 }
                 return nil
             }
@@ -302,20 +320,30 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
         }
 
         flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            guard let self, let handle = self.handle else { return event }
-            let shouldPeek = self.settings.peekModifier.isActive(in: event.modifierFlags)
-            let currentlyPeeking = self.viewModel.isPeeking
-
-            if shouldPeek != currentlyPeeking {
-                Task {
-                    if shouldPeek {
-                        await handle.beginPeek()
-                    } else {
-                        await handle.endPeek()
-                    }
-                }
-            }
+            self?.handleFlagsChanged(event.modifierFlags)
             return event
+        }
+
+        globalFlagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            let rawFlags = event.modifierFlags.rawValue
+            Task { @MainActor [weak self] in
+                self?.handleFlagsChanged(NSEvent.ModifierFlags(rawValue: rawFlags))
+            }
+        }
+    }
+
+    private func handleFlagsChanged(_ flags: NSEvent.ModifierFlags) {
+        guard let handle else { return }
+
+        let shouldPeek = settings.peekModifier.isActive(in: flags)
+        guard shouldPeek != viewModel.isPeeking else { return }
+
+        Task {
+            if shouldPeek {
+                await handle.beginPeek()
+            } else {
+                await handle.endPeek()
+            }
         }
     }
 
@@ -358,7 +386,12 @@ final class ManagedOverlayPresentationSession: @unchecked Sendable {
             },
             pinAction: {
                 Task {
-                    await handle.pin()
+                    await handle.togglePin()
+                }
+            },
+            peekAction: {
+                Task {
+                    await handle.togglePeek()
                 }
             },
             styleAction: { style in
@@ -506,7 +539,7 @@ private struct OverlayRenderedBlockView: View {
     var body: some View {
         switch style {
         case .cleanPatch:
-            CleanPatchBlockView(block: block, appearance: appearance)
+            LiquidGlassBlockView(block: block, appearance: appearance)
         case .blurPatch:
             BlurPatchBlockView(block: block, appearance: appearance)
         case .subtitle:
@@ -523,19 +556,22 @@ private struct OverlayRenderedBlockView: View {
     }
 }
 
-private struct CleanPatchBlockView: View {
+private struct LiquidGlassBlockView: View {
     let block: OverlayRenderedBlock
     let appearance: OverlayBlockAppearance
 
     var body: some View {
-        Text(block.translation.translatedText)
-            .font(.system(size: block.fontSize, weight: .semibold))
-            .foregroundStyle(appearance.foregroundColor)
-            .multilineTextAlignment(block.textAlignment.swiftUITextAlignment)
-            .lineLimit(nil)
+        OverlayTextDrawingView(
+            text: block.translation.translatedText,
+            fontSize: block.fontSize,
+            weight: .semibold,
+            foregroundColor: appearance.foregroundNSColor,
+            alignment: block.textAlignment,
+            direction: block.direction
+        )
             .frame(
-                width: max(block.frame.width - (block.horizontalPadding * 2), 24),
-                height: max(block.frame.height - (block.verticalPadding * 2), 18),
+                width: max(block.frame.width - (block.horizontalPadding * 2), 1),
+                height: max(block.frame.height - (block.verticalPadding * 2), 1),
                 alignment: block.textAlignment.swiftUIAlignment
             )
             .frame(
@@ -544,14 +580,62 @@ private struct CleanPatchBlockView: View {
                 alignment: block.textAlignment.swiftUIAlignment
             )
             .background {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(appearance.cleanPatchFill)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.01))
+                        .glassEffect(
+                            .regular.tint(appearance.cleanPatchFill.opacity(0.30)),
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        )
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(appearance.cleanPatchFill.opacity(0.44))
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.52),
+                                    .white.opacity(0.14),
+                                    .clear,
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .center
+                            )
+                        )
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .clear,
+                                    .black.opacity(0.12),
+                                ],
+                                startPoint: .center,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(.white.opacity(0.18), lineWidth: 0.5)
+                        .blur(radius: 0.8)
+                }
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(appearance.foregroundColor.opacity(0.12), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.78),
+                                .white.opacity(0.20),
+                                .black.opacity(0.20),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             )
-            .shadow(color: appearance.foregroundColor.opacity(0.15), radius: 4, y: 1)
+            .shadow(color: .white.opacity(0.22), radius: 2, x: -1, y: -1)
+            .shadow(color: .black.opacity(0.30), radius: 12, x: 0, y: 4)
             .environment(\.layoutDirection, block.direction.swiftUILayoutDirection)
     }
 }
@@ -567,14 +651,17 @@ private struct BlurPatchBlockView: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(appearance.tintColor.opacity(0.22))
 
-            Text(block.translation.translatedText)
-                .font(.system(size: block.fontSize, weight: .semibold))
-                .foregroundStyle(appearance.foregroundColor)
-                .multilineTextAlignment(block.textAlignment.swiftUITextAlignment)
-                .lineLimit(nil)
+            OverlayTextDrawingView(
+                text: block.translation.translatedText,
+                fontSize: block.fontSize,
+                weight: .semibold,
+                foregroundColor: appearance.foregroundNSColor,
+                alignment: block.textAlignment,
+                direction: block.direction
+            )
                 .frame(
-                    width: max(block.frame.width - (block.horizontalPadding * 2), 24),
-                    height: max(block.frame.height - (block.verticalPadding * 2), 18),
+                    width: max(block.frame.width - (block.horizontalPadding * 2), 1),
+                    height: max(block.frame.height - (block.verticalPadding * 2), 1),
                     alignment: block.textAlignment.swiftUIAlignment
                 )
         }
@@ -601,7 +688,14 @@ private struct SubtitleBlockView: View {
     ]
 
     var body: some View {
+        let _ = OverlayFont.register()
+
         ZStack {
+            if settings.subtitleShowBackground {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(appearance.subtitleBackground.opacity(0.58))
+            }
+
             if settings.subtitleShowBorder {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(appearance.subtitleOutline.opacity(0.18), lineWidth: 1)
@@ -624,7 +718,7 @@ private struct SubtitleBlockView: View {
 
     private var subtitleText: some View {
         Text(block.translation.translatedText)
-            .font(.system(size: block.fontSize, weight: .bold))
+            .font(.custom(OverlayFont.postScriptName, size: block.fontSize))
             .multilineTextAlignment(block.textAlignment.swiftUITextAlignment)
             .lineLimit(nil)
             .frame(
@@ -635,12 +729,71 @@ private struct SubtitleBlockView: View {
     }
 }
 
+private struct OverlayTextDrawingView: NSViewRepresentable {
+    let text: String
+    let fontSize: CGFloat
+    let weight: NSFont.Weight
+    let foregroundColor: NSColor
+    let alignment: OverlayTextAlignment
+    let direction: OverlayTextDirection
+
+    func makeNSView(context: Context) -> OverlayTextNSView {
+        let view = OverlayTextNSView()
+        view.wantsLayer = false
+        return view
+    }
+
+    func updateNSView(_ nsView: OverlayTextNSView, context: Context) {
+        nsView.text = text
+        nsView.fontSize = fontSize
+        nsView.weight = weight
+        nsView.foregroundColor = foregroundColor
+        nsView.alignment = alignment
+        nsView.direction = direction
+    }
+}
+
+private final class OverlayTextNSView: NSView {
+    var text: String = "" { didSet { needsDisplay = true } }
+    var fontSize: CGFloat = 12 { didSet { needsDisplay = true } }
+    var weight: NSFont.Weight = .regular { didSet { needsDisplay = true } }
+    var foregroundColor: NSColor = .white { didSet { needsDisplay = true } }
+    var alignment: OverlayTextAlignment = .leading { didSet { needsDisplay = true } }
+    var direction: OverlayTextDirection = .leftToRight { didSet { needsDisplay = true } }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard bounds.width > 0, bounds.height > 0, !text.isEmpty else { return }
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byWordWrapping
+        paragraph.alignment = alignment.nsTextAlignment
+        paragraph.baseWritingDirection = direction.nsWritingDirection
+
+        let attributed = NSAttributedString(
+            string: text,
+            attributes: [
+                .font: OverlayFont.nsFont(ofSize: fontSize, fallbackWeight: weight),
+                .foregroundColor: foregroundColor,
+                .paragraphStyle: paragraph,
+            ]
+        )
+        attributed.draw(
+            with: bounds,
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        )
+    }
+}
+
 private struct OverlayBlockAppearance {
     let tintColor: Color
     let cleanPatchFill: Color
     let foregroundColor: Color
+    let foregroundNSColor: NSColor
     let subtitleFill: Color
     let subtitleOutline: Color
+    let subtitleBackground: Color
 
     @MainActor
     static func make(
@@ -654,13 +807,18 @@ private struct OverlayBlockAppearance {
         ) ?? NSColor(calibratedWhite: 0.18, alpha: 1)
         let foreground = SourceVisualAnalyzer.contrastingColor(for: sampled)
         let muted = SourceVisualAnalyzer.mutedTint(from: sampled, foreground: foreground)
+        let subtitleFill = NSColor(hex: settings.subtitleTextColorHex) ?? .white
+        let subtitleOutline = NSColor(hex: settings.subtitleOutlineColorHex) ?? .black
+        let subtitleBackground = NSColor(hex: settings.subtitleBackgroundColorHex) ?? .black
 
         return OverlayBlockAppearance(
             tintColor: Color(nsColor: sampled),
             cleanPatchFill: Color(nsColor: muted),
             foregroundColor: Color(nsColor: foreground),
-            subtitleFill: Color(hex: settings.subtitleTextColorHex) ?? .white,
-            subtitleOutline: Color(hex: settings.subtitleOutlineColorHex) ?? .black
+            foregroundNSColor: foreground,
+            subtitleFill: Color(nsColor: subtitleFill),
+            subtitleOutline: Color(nsColor: subtitleOutline),
+            subtitleBackground: Color(nsColor: subtitleBackground)
         )
     }
 }
@@ -745,6 +903,13 @@ private extension OverlayTextDirection {
         case .rightToLeft: return .rightToLeft
         }
     }
+
+    var nsWritingDirection: NSWritingDirection {
+        switch self {
+        case .leftToRight: return .leftToRight
+        case .rightToLeft: return .rightToLeft
+        }
+    }
 }
 
 private extension OverlayTextAlignment {
@@ -752,6 +917,14 @@ private extension OverlayTextAlignment {
         switch self {
         case .leading: return .leading
         case .trailing: return .trailing
+        case .center: return .center
+        }
+    }
+
+    var nsTextAlignment: NSTextAlignment {
+        switch self {
+        case .leading: return .left
+        case .trailing: return .right
         case .center: return .center
         }
     }
@@ -776,14 +949,14 @@ private extension PeekModifier {
     }
 }
 
-private extension Color {
-    init?(hex: String) {
+private extension NSColor {
+    convenience init?(hex: String) {
         let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         guard cleaned.count == 6, let value = Int(cleaned, radix: 16) else { return nil }
 
-        let red = Double((value >> 16) & 0xFF) / 255.0
-        let green = Double((value >> 8) & 0xFF) / 255.0
-        let blue = Double(value & 0xFF) / 255.0
-        self = Color(red: red, green: green, blue: blue)
+        let red = CGFloat((value >> 16) & 0xFF) / 255.0
+        let green = CGFloat((value >> 8) & 0xFF) / 255.0
+        let blue = CGFloat(value & 0xFF) / 255.0
+        self.init(calibratedRed: red, green: green, blue: blue, alpha: 1)
     }
 }

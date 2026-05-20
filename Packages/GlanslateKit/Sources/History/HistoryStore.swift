@@ -39,6 +39,7 @@ public protocol HistoryStoring: AnyObject {
     func pin(_ translation: Translation, thumbnail: Data?) async throws
     func list() async throws -> [PinnedTranslation]
     func delete(_ id: UUID) async throws
+    func deleteAll() async throws
 }
 
 @MainActor
@@ -93,6 +94,17 @@ public final class SwiftDataHistoryStore: HistoryStoring {
             try context.save()
         }
     }
+
+    public func deleteAll() async throws {
+        let context = ModelContext(container)
+        let matches = try context.fetch(FetchDescriptor<PinnedTranslation>())
+        for item in matches {
+            context.delete(item)
+        }
+        if !matches.isEmpty {
+            try context.save()
+        }
+    }
 }
 
 @MainActor
@@ -101,4 +113,5 @@ public final class NoopHistoryStore: HistoryStoring {
     public func pin(_ translation: Translation, thumbnail: Data?) async throws {}
     public func list() async throws -> [PinnedTranslation] { [] }
     public func delete(_ id: UUID) async throws {}
+    public func deleteAll() async throws {}
 }

@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import XCTest
 @testable import GlanslateOverlay
@@ -23,5 +24,13 @@ final class OverlayToolbarTests: XCTestCase {
 
         state.update(pointer: CGPoint(x: 10, y: 10), toolbarFrame: frame)
         XCTAssertEqual(state.opacity, OverlayToolbarHoverState.restingOpacity)
+    }
+
+    func testQuestrialFontIsBundledAndRegistered() {
+        OverlayFont.register()
+
+        let font = NSFont(name: OverlayFont.postScriptName, size: 14)
+        XCTAssertNotNil(font)
+        XCTAssertEqual(font?.familyName, "Questrial")
     }
 }

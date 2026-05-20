@@ -6,7 +6,7 @@ import XCTest
 @testable import GlanslateOverlay
 
 final class OverlayLayoutEngineTests: XCTestCase {
-    func testLongTranslationGrowsButStaysAnchoredToSourceOrigin() {
+    func testLongTranslationGrowsHorizontallyBeforeClipping() {
         let source = sampleSource(region: CGRect(x: 20, y: 20, width: 520, height: 360))
         let blockRect = CGRect(x: 210, y: 150, width: 80, height: 24)
         let translation = makeTranslation(
@@ -22,11 +22,13 @@ final class OverlayLayoutEngineTests: XCTestCase {
         )
 
         XCTAssertTrue(source.region.rect.contains(rendered.frame))
-        // The box grows to fit the longer translation...
-        XCTAssertGreaterThan(rendered.frame.height, blockRect.height)
-        // ...but the box stays anchored to the source — its top-left corner does not drift.
-        XCTAssertLessThanOrEqual(rendered.frame.minX, blockRect.minX + 0.5)
-        XCTAssertEqual(rendered.frame.minY, blockRect.minY, accuracy: 0.5)
+        XCTAssertEqual(rendered.frame.minX, blockRect.minX - 1, accuracy: 0.5)
+        XCTAssertEqual(rendered.frame.minY, blockRect.minY - 1, accuracy: 0.5)
+        XCTAssertGreaterThan(rendered.frame.width, blockRect.width)
+        XCTAssertEqual(rendered.frame.height, blockRect.insetBy(dx: -1, dy: -1).height, accuracy: 0.5)
+        XCTAssertGreaterThanOrEqual(rendered.fontSize, 8)
+        XCTAssertEqual(rendered.horizontalPadding, 3)
+        XCTAssertEqual(rendered.verticalPadding, 2)
     }
 
     func testShortTranslationDoesNotProduceOversizedBox() {
@@ -43,9 +45,7 @@ final class OverlayLayoutEngineTests: XCTestCase {
         // A short translation must not blow the box up to the whole selection.
         XCTAssertLessThan(rendered.frame.width, source.region.rect.width)
         XCTAssertLessThan(rendered.frame.height, source.region.rect.height)
-        // It stays anchored on the source block.
-        XCTAssertEqual(rendered.frame.minX, blockRect.minX, accuracy: 0.5)
-        XCTAssertEqual(rendered.frame.minY, blockRect.minY, accuracy: 0.5)
+        XCTAssertEqual(rendered.frame, blockRect.insetBy(dx: -1, dy: -1))
     }
 
     func testArabicUsesRightToLeftDirectionAndTrailingAlignment() {
@@ -66,11 +66,12 @@ final class OverlayLayoutEngineTests: XCTestCase {
         XCTAssertEqual(rendered.textAlignment, .trailing)
     }
 
-    func testExcludedToolbarRectPushesBlockAwayFromCollision() {
+    func testBlockNearRightEdgeExpandsLeftWithinBounds() {
         let source = sampleSource(region: CGRect(x: 0, y: 0, width: 420, height: 240))
+        let blockRect = CGRect(x: 290, y: 18, width: 90, height: 24)
         let translation = makeTranslation(
             text: "Toolbar collision case",
-            blockRect: CGRect(x: 290, y: 18, width: 90, height: 24),
+            blockRect: blockRect,
             language: .en
         )
         let toolbarRect = CGRect(x: 230, y: 12, width: 170, height: 58)
@@ -82,11 +83,13 @@ final class OverlayLayoutEngineTests: XCTestCase {
             excludedRects: [toolbarRect]
         )
 
-        XCTAssertFalse(rendered.frame.intersects(toolbarRect))
         XCTAssertTrue(source.region.rect.contains(rendered.frame))
+        XCTAssertTrue(rendered.frame.contains(blockRect.insetBy(dx: -1, dy: -1)))
+        XCTAssertGreaterThan(rendered.frame.width, blockRect.width)
+        XCTAssertEqual(rendered.frame.maxX, source.region.rect.maxX, accuracy: 0.5)
     }
 
-    func testMultipleTranslationsRenderAsOneSequentialBox() {
+    func testMultipleTranslationsRenderOnTheirSourceBoxes() {
         let source = sampleSource(region: CGRect(x: 0, y: 0, width: 420, height: 260))
         let first = makeTranslation(
             text: "First translated line",
@@ -105,9 +108,13 @@ final class OverlayLayoutEngineTests: XCTestCase {
             style: .cleanPatch
         )
 
-        XCTAssertEqual(rendered.count, 1)
-        XCTAssertEqual(rendered[0].translation.translatedText, "First translated line\nSecond translated line")
-        XCTAssertTrue(source.region.rect.contains(rendered[0].frame))
+        XCTAssertEqual(rendered.count, 2)
+        XCTAssertEqual(rendered[0].translation.translatedText, "Second translated line")
+        XCTAssertEqual(rendered[1].translation.translatedText, "First translated line")
+        XCTAssertTrue(rendered[0].frame.contains(second.block.region.rect.insetBy(dx: -1, dy: -1)))
+        XCTAssertTrue(rendered[1].frame.contains(first.block.region.rect.insetBy(dx: -1, dy: -1)))
+        XCTAssertGreaterThan(rendered[0].frame.width, second.block.region.rect.width)
+        XCTAssertGreaterThan(rendered[1].frame.width, first.block.region.rect.width)
     }
 
     private func makeTranslation(

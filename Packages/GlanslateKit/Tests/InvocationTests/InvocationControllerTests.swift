@@ -78,6 +78,7 @@ private struct StubTranslator: TranslationRouting {
 
 private actor RecordingTranslator: TranslationRouting {
     private(set) var requests: [(Language, InvocationRoutingOverride?)] = []
+    private(set) var blockRequests: [[TextBlock]] = []
 
     func translate(
         _ blocks: [TextBlock],
@@ -85,6 +86,7 @@ private actor RecordingTranslator: TranslationRouting {
         invocationOverride: InvocationRoutingOverride?
     ) async throws -> [GlanslateCore.Translation] {
         requests.append((target, invocationOverride))
+        blockRequests.append(blocks)
         let provider = invocationOverride?.provider ?? .openAI
         return blocks.map { block in
             GlanslateCore.Translation(
@@ -94,6 +96,10 @@ private actor RecordingTranslator: TranslationRouting {
                 provider: provider
             )
         }
+    }
+
+    func latestBlocks() -> [TextBlock] {
+        blockRequests.last ?? []
     }
 }
 
@@ -175,6 +181,12 @@ private actor RecordingOverlayPresenter: OverlayPresenting {
                 OverlayPinnedPayload(
                     translations: session.translations,
                     thumbnailPNG: Data([9, 9, 9])
+                )
+            },
+            onUnpin: {
+                OverlayPinnedPayload(
+                    translations: session.translations,
+                    thumbnailPNG: nil
                 )
             },
             onApplyRetranslation: { [weak self] translations, _ in
@@ -331,6 +343,39 @@ final class InvocationControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testInvocationGroupsDetectedLinesBeforeTranslation() async throws {
+        let blocks = sampleParagraphBlocks()
+        let translator = RecordingTranslator()
+        let overlay = RecordingOverlayPresenter()
+        let controller = InvocationController(
+            topology: StubTopology(snapshot: sampleTopology()),
+            regionSelect: StubRegionSelector(selection: RegionSelection(region: blocks[0].region, topology: sampleTopology())),
+            capture: StubCapture(source: sampleSource()),
+            detect: StubDetector(blocks: blocks),
+            translate: translator,
+            overlay: overlay,
+            history: try SwiftDataHistoryStore(inMemory: true),
+            settings: SettingsStore(
+                defaults: UserDefaults(suiteName: "InvocationGrouped-\(UUID().uuidString)")!,
+                keychain: KeychainStore(service: "InvocationGrouped-\(UUID().uuidString)")
+            )
+        )
+
+        await controller.start()
+        _ = await waitForHandle(from: overlay)
+
+        let translatedBlocks = await translator.latestBlocks()
+        XCTAssertEqual(translatedBlocks.count, 1)
+        XCTAssertEqual(
+            translatedBlocks[0].text,
+            "Thanks for your comment. You have a point. I would also behave like you in terms of security. It is an open-source app."
+        )
+        XCTAssertEqual(translatedBlocks[0].region.rect, CGRect(x: 10, y: 10, width: 72, height: 44))
+
+        await overlay.dismissAll()
+    }
+
+    @MainActor
     func testHappyPathIgnoresFreshTopologyTimestampWhenArrangementMatches() async throws {
         let snapshots = [
             sampleTopology(capturedAt: Date(timeIntervalSince1970: 1)),
@@ -443,6 +488,10 @@ final class InvocationControllerTests: XCTestCase {
         XCTAssertEqual(items[0].translatedText, "merhaba")
         XCTAssertEqual(items[0].snapshotPNG, Data([9, 9, 9]))
 
+        await handle.unpin()
+        let itemsAfterUnpin = try await waitForHistoryItems(in: history, expectedCount: 1)
+        XCTAssertEqual(itemsAfterUnpin[0].translatedText, "merhaba")
+
         await overlay.dismissAll()
     }
 
@@ -554,6 +603,32 @@ final class InvocationControllerTests: XCTestCase {
                 confidence: 1,
                 source: .vision
             )
+        ]
+    }
+
+    private func sampleParagraphBlocks() -> [TextBlock] {
+        [
+            TextBlock(
+                text: "Thanks for your comment. You have a point.",
+                region: DisplayLocalRect(displayID: 1, rect: CGRect(x: 10, y: 10, width: 68, height: 12)),
+                detectedLanguage: .en,
+                confidence: 1,
+                source: .vision
+            ),
+            TextBlock(
+                text: "I would also behave like you in terms of security.",
+                region: DisplayLocalRect(displayID: 1, rect: CGRect(x: 10, y: 26, width: 72, height: 12)),
+                detectedLanguage: .en,
+                confidence: 1,
+                source: .vision
+            ),
+            TextBlock(
+                text: "It is an open-source app.",
+                region: DisplayLocalRect(displayID: 1, rect: CGRect(x: 10, y: 42, width: 48, height: 12)),
+                detectedLanguage: .en,
+                confidence: 1,
+                source: .vision
+            ),
         ]
     }
 

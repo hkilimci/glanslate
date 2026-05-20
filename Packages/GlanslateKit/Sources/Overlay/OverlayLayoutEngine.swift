@@ -26,83 +26,29 @@ enum OverlayTextDirection: Sendable, Hashable {
 }
 
 struct OverlayLayoutEngine: Sendable {
+    private struct LayoutMetrics {
+        let outerPadding: CGFloat
+        let horizontalPadding: CGFloat
+        let verticalPadding: CGFloat
+        let minFontSize: CGFloat
+        let maxFontSize: CGFloat
+        let weight: NSFont.Weight
+    }
+
     static func renderedBlocks(
         translations: [GlanslateCore.Translation],
         source: SourceVisualContext,
         style: OverlayStyle,
         excludedRects: [CGRect] = []
     ) -> [OverlayRenderedBlock] {
-        if translations.count > 1,
-           let combined = renderedCombinedBlock(
-               translations: translations,
-               source: source,
-               style: style,
-               excludedRects: excludedRects
-           ) {
-            return [combined]
-        }
-
-        var results: [OverlayRenderedBlock] = []
-        var cumulativeExcluded = excludedRects
-
-        for translation in translations {
-            let block = renderedBlock(
+        translations.map { translation in
+            renderedBlock(
                 for: translation,
                 source: source,
                 style: style,
-                excludedRects: cumulativeExcluded
+                excludedRects: excludedRects
             )
-            results.append(block)
-            // Add this block (with a small padding) to exclusions so subsequent blocks avoid it.
-            cumulativeExcluded.append(block.frame.insetBy(dx: -4, dy: -4))
         }
-
-        return results
-    }
-
-    static func renderedCombinedBlock(
-        translations: [GlanslateCore.Translation],
-        source: SourceVisualContext,
-        style: OverlayStyle,
-        excludedRects: [CGRect] = []
-    ) -> OverlayRenderedBlock? {
-        let ordered = translations.sortedForSequentialDisplay()
-        guard let first = ordered.first else { return nil }
-
-        let combinedText = ordered
-            .map { $0.translatedText.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
-        let sourceText = ordered
-            .map(\.block.text)
-            .joined(separator: "\n")
-
-        let combinedRegion = DisplayLocalRect(
-            displayID: first.block.region.displayID,
-            rect: combinedSourceRect(for: ordered, within: source.region.rect)
-        )
-        let combinedBlock = TextBlock(
-            id: first.block.id,
-            text: sourceText,
-            region: combinedRegion,
-            detectedLanguage: first.block.detectedLanguage,
-            confidence: first.block.confidence,
-            source: first.block.source
-        )
-        let combinedTranslation = GlanslateCore.Translation(
-            id: first.id,
-            block: combinedBlock,
-            translatedText: combinedText.isEmpty ? sourceText : combinedText,
-            targetLanguage: first.targetLanguage,
-            provider: first.provider
-        )
-
-        return renderedBlock(
-            for: combinedTranslation,
-            source: source,
-            style: style,
-            excludedRects: excludedRects
-        )
     }
 
     static func renderedBlock(
@@ -116,132 +62,252 @@ struct OverlayLayoutEngine: Sendable {
         let alignment: OverlayTextAlignment = translation.targetLanguage.isRightToLeft ? .trailing : .leading
         let direction: OverlayTextDirection = translation.targetLanguage.isRightToLeft ? .rightToLeft : .leftToRight
 
-        let lineCount = max(1, translation.translatedText.split(whereSeparator: \.isNewline).count)
-        let minFontSize: CGFloat = style == .subtitle ? 12 : (lineCount > 1 ? 11 : 14)
-        let maxFontSize: CGFloat = 28
-        // Scale the font to the source line height (macshot's 0.65 ratio), kept within readable bounds.
-        var fontSize = max(minFontSize, min(maxFontSize, original.height * 0.65))
-        let horizontalPadding: CGFloat = style == .subtitle ? 0 : max(8, original.height * 0.22)
-        let verticalPadding: CGFloat = style == .subtitle ? 0 : max(6, original.height * 0.16)
-        let weight: NSFont.Weight = style == .subtitle ? .bold : .semibold
-
-        let maxWidth = bounds.width
-        let maxHeight = bounds.height
-        // Room available growing straight down from the source top edge (no upward drift).
-        let maxDownHeight = min(maxHeight, max(original.height, bounds.maxY - original.minY))
-
-        // The box never starts smaller than the source text box.
-        var boxWidth = min(maxWidth, max(original.width, original.width + horizontalPadding * 2))
-        var boxHeight = min(maxDownHeight, max(original.height, original.height + verticalPadding * 2))
-
-        func textWidth(for width: CGFloat) -> CGFloat {
-            max(width - horizontalPadding * 2, 24)
-        }
-        func neededHeight(at width: CGFloat) -> CGFloat {
-            measure(
-                text: translation.translatedText,
-                width: textWidth(for: width),
-                fontSize: fontSize,
-                weight: weight
-            ).height + verticalPadding * 2
-        }
-
-        // `measure` wraps to the given width, so width never overflows on its own. To fit a
-        // longer translation: grow height downward, then widen the box (which reduces the line
-        // count and height), then shrink the font, and only as a last resort grow past the
-        // downward room. Every dimension is monotonic and capped, so this terminates.
-        while true {
-            let need = neededHeight(at: boxWidth)
-            if need <= boxHeight + 1 { break }
-            if boxHeight < maxDownHeight {
-                boxHeight = min(maxDownHeight, need)
-                continue
-            }
-            if boxWidth < maxWidth {
-                boxWidth = min(maxWidth, boxWidth + max(40, boxWidth * 0.25))
-                continue
-            }
-            if fontSize > minFontSize {
-                fontSize = max(minFontSize, fontSize - 1)
-                continue
-            }
-            if boxHeight < maxHeight {
-                boxHeight = min(maxHeight, need)
-                continue
-            }
-            break
-        }
-
-        // Shrink the box back to a snug fit around the final text.
-        let finalMeasured = measure(
+        let metrics = layoutMetrics(for: style)
+        let baseFrame = clamp(
+            original.insetBy(dx: -metrics.outerPadding, dy: -metrics.outerPadding),
+            within: bounds
+        )
+        let initialFontSize = max(
+            metrics.minFontSize,
+            min(metrics.maxFontSize, original.height * 0.65)
+        )
+        let fitted = fittedFrame(
             text: translation.translatedText,
-            width: textWidth(for: boxWidth),
-            fontSize: fontSize,
-            weight: weight
-        )
-        boxWidth = min(boxWidth, max(original.width, finalMeasured.width + horizontalPadding * 2))
-        boxHeight = min(boxHeight, max(original.height, finalMeasured.height + verticalPadding * 2))
-
-        let baseRect = anchoredRect(
-            source: original,
-            size: CGSize(width: boxWidth, height: boxHeight),
-            within: bounds,
-            direction: direction
-        )
-        let finalFrame = adjustedToAvoidExcludedRects(
-            baseRect,
-            within: bounds,
-            excludedRects: excludedRects
+            sourceFrame: baseFrame,
+            bounds: bounds,
+            direction: direction,
+            initialFontSize: initialFontSize,
+            metrics: metrics
         )
 
         return OverlayRenderedBlock(
             id: translation.id,
             translation: translation,
-            frame: finalFrame,
-            fontSize: fontSize,
-            horizontalPadding: horizontalPadding,
-            verticalPadding: verticalPadding,
+            frame: fitted.frame,
+            fontSize: fitted.fontSize,
+            horizontalPadding: metrics.horizontalPadding,
+            verticalPadding: metrics.verticalPadding,
             textAlignment: alignment,
             direction: direction
         )
     }
 
-    /// Anchors the overlay box to the source block's leading-top corner and grows it in the
-    /// reading direction and downward, clamped to `bounds`. The box never drifts off the
-    /// source text the way a centroid-centered box does when the translation length differs.
-    private static func anchoredRect(
-        source original: CGRect,
-        size: CGSize,
-        within bounds: CGRect,
-        direction: OverlayTextDirection
-    ) -> CGRect {
-        let width = min(size.width, bounds.width)
-        let height = min(size.height, bounds.height)
+    private static func layoutMetrics(for style: OverlayStyle) -> LayoutMetrics {
+        switch style {
+        case .cleanPatch, .blurPatch:
+            return LayoutMetrics(
+                outerPadding: 1,
+                horizontalPadding: 3,
+                verticalPadding: 2,
+                minFontSize: 8,
+                maxFontSize: 28,
+                weight: .semibold
+            )
+        case .subtitle:
+            return LayoutMetrics(
+                outerPadding: 0,
+                horizontalPadding: 0,
+                verticalPadding: 0,
+                minFontSize: 12,
+                maxFontSize: 32,
+                weight: .bold
+            )
+        }
+    }
 
-        var originX: CGFloat
-        switch direction {
-        case .leftToRight:
-            originX = original.minX
-            if originX + width > bounds.maxX {
-                originX = bounds.maxX - width
-            }
-            originX = max(originX, bounds.minX)
-        case .rightToLeft:
-            var maxX = original.maxX
-            if maxX - width < bounds.minX {
-                maxX = bounds.minX + width
-            }
-            maxX = min(maxX, bounds.maxX)
-            originX = maxX - width
+    private static func fittedFrame(
+        text: String,
+        sourceFrame: CGRect,
+        bounds: CGRect,
+        direction: OverlayTextDirection,
+        initialFontSize: CGFloat,
+        metrics: LayoutMetrics
+    ) -> (frame: CGRect, fontSize: CGFloat) {
+        let baseWidth = min(max(sourceFrame.width, 1), bounds.width)
+        let baseHeight = min(max(sourceFrame.height, 1), bounds.height)
+        let maxWidth = max(baseWidth, bounds.width)
+        let maxHeight = max(baseHeight, bounds.height)
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            return (sourceFrame, initialFontSize)
         }
 
-        var originY = original.minY
-        if originY + height > bounds.maxY {
-            originY = bounds.maxY - height
+        if let fitted = bestFittedFrame(
+            text: text,
+            sourceFrame: sourceFrame,
+            bounds: bounds,
+            direction: direction,
+            initialFontSize: initialFontSize,
+            minFontSize: initialFontSize,
+            maxAllowedHeight: baseHeight,
+            metrics: metrics
+        ) {
+            return fitted
         }
-        originY = max(originY, bounds.minY)
 
-        return CGRect(x: originX, y: originY, width: width, height: height)
+        if let fitted = bestFittedFrame(
+            text: text,
+            sourceFrame: sourceFrame,
+            bounds: bounds,
+            direction: direction,
+            initialFontSize: initialFontSize - 1,
+            minFontSize: metrics.minFontSize,
+            maxAllowedHeight: baseHeight,
+            metrics: metrics
+        ) {
+            return fitted
+        }
+
+        if let fitted = bestFittedFrame(
+            text: text,
+            sourceFrame: sourceFrame,
+            bounds: bounds,
+            direction: direction,
+            initialFontSize: initialFontSize,
+            minFontSize: metrics.minFontSize,
+            maxAllowedHeight: maxHeight,
+            metrics: metrics
+        ) {
+            return fitted
+        }
+
+        let fallbackFrame = anchoredRect(
+            source: sourceFrame,
+            size: CGSize(width: maxWidth, height: maxHeight),
+            within: bounds,
+            direction: direction
+        )
+        return (fallbackFrame, metrics.minFontSize)
+    }
+
+    private static func bestFittedFrame(
+        text: String,
+        sourceFrame: CGRect,
+        bounds: CGRect,
+        direction: OverlayTextDirection,
+        initialFontSize: CGFloat,
+        minFontSize: CGFloat,
+        maxAllowedHeight: CGFloat,
+        metrics: LayoutMetrics
+    ) -> (frame: CGRect, fontSize: CGFloat)? {
+        guard initialFontSize >= minFontSize else { return nil }
+
+        var fontSize = initialFontSize
+        var testedMinimum = false
+        while fontSize >= minFontSize {
+            testedMinimum = abs(fontSize - minFontSize) < 0.001
+            if let frame = smallestFittingFrame(
+                text: text,
+                sourceFrame: sourceFrame,
+                bounds: bounds,
+                direction: direction,
+                fontSize: fontSize,
+                maxAllowedHeight: maxAllowedHeight,
+                metrics: metrics
+            ) {
+                return (frame, fontSize)
+            }
+            fontSize -= 1
+        }
+        if !testedMinimum,
+           let frame = smallestFittingFrame(
+               text: text,
+               sourceFrame: sourceFrame,
+               bounds: bounds,
+               direction: direction,
+               fontSize: minFontSize,
+               maxAllowedHeight: maxAllowedHeight,
+               metrics: metrics
+           ) {
+            return (frame, minFontSize)
+        }
+        return nil
+    }
+
+    private static func smallestFittingFrame(
+        text: String,
+        sourceFrame: CGRect,
+        bounds: CGRect,
+        direction: OverlayTextDirection,
+        fontSize: CGFloat,
+        maxAllowedHeight: CGFloat,
+        metrics: LayoutMetrics
+    ) -> CGRect? {
+        let baseWidth = min(max(sourceFrame.width, 1), bounds.width)
+        let baseHeight = min(max(sourceFrame.height, 1), maxAllowedHeight)
+        let maxWidth = max(baseWidth, bounds.width)
+        let maxHeight = max(baseHeight, min(maxAllowedHeight, bounds.height))
+
+        guard fits(
+            text: text,
+            width: maxWidth,
+            height: maxHeight,
+            fontSize: fontSize,
+            metrics: metrics
+        ) else {
+            return nil
+        }
+
+        if fits(
+            text: text,
+            width: baseWidth,
+            height: baseHeight,
+            fontSize: fontSize,
+            metrics: metrics
+        ) {
+            return sourceFrame
+        }
+
+        var low = baseWidth
+        var high = maxWidth
+        for _ in 0..<18 {
+            let mid = (low + high) / 2
+            if fits(
+                text: text,
+                width: mid,
+                height: maxHeight,
+                fontSize: fontSize,
+                metrics: metrics
+            ) {
+                high = mid
+            } else {
+                low = mid
+            }
+        }
+
+        let width = ceil(high)
+        let textWidth = max(width - metrics.horizontalPadding * 2, 1)
+        let measured = measure(
+            text: text,
+            width: textWidth,
+            fontSize: fontSize,
+            weight: metrics.weight
+        )
+        let height = ceil(max(baseHeight, measured.height + metrics.verticalPadding * 2))
+        return anchoredRect(
+            source: sourceFrame,
+            size: CGSize(width: width, height: min(maxHeight, height)),
+            within: bounds,
+            direction: direction
+        )
+    }
+
+    private static func fits(
+        text: String,
+        width: CGFloat,
+        height: CGFloat,
+        fontSize: CGFloat,
+        metrics: LayoutMetrics
+    ) -> Bool {
+        let textWidth = max(width - metrics.horizontalPadding * 2, 1)
+        let textHeight = max(height - metrics.verticalPadding * 2, 1)
+        let measured = measure(
+            text: text,
+            width: textWidth,
+            fontSize: fontSize,
+            weight: metrics.weight
+        )
+        return measured.width <= textWidth + 1 && measured.height <= textHeight + 1
     }
 
     private static func measure(
@@ -250,94 +316,60 @@ struct OverlayLayoutEngine: Sendable {
         fontSize: CGFloat,
         weight: NSFont.Weight
     ) -> CGSize {
-        let font = NSFont.systemFont(ofSize: fontSize, weight: weight)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byWordWrapping
         let bounding = (text as NSString).boundingRect(
             with: CGSize(width: width, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: font]
+            attributes: [
+                .font: OverlayFont.nsFont(ofSize: fontSize, fallbackWeight: weight),
+                .paragraphStyle: paragraph,
+            ]
         )
         return CGSize(width: ceil(bounding.width), height: ceil(bounding.height))
     }
 
-    private static func adjustedToAvoidExcludedRects(
-        _ frame: CGRect,
+    private static func anchoredRect(
+        source: CGRect,
+        size: CGSize,
         within bounds: CGRect,
-        excludedRects: [CGRect]
+        direction: OverlayTextDirection
     ) -> CGRect {
-        guard !excludedRects.isEmpty else { return frame }
+        let width = min(max(size.width, 1), bounds.width)
+        let height = min(max(size.height, 1), bounds.height)
 
-        let collisionPadding = CGFloat(10)
-        var adjusted = frame
-
-        for excluded in excludedRects {
-            let paddedExcluded = excluded.insetBy(dx: -collisionPadding, dy: -collisionPadding)
-            guard adjusted.intersects(paddedExcluded) else { continue }
-
-            let shiftedDown = CGRect(
-                x: adjusted.origin.x,
-                y: min(bounds.maxY - adjusted.height, paddedExcluded.maxY + collisionPadding),
-                width: adjusted.width,
-                height: adjusted.height
-            )
-            if bounds.contains(shiftedDown) && !shiftedDown.intersects(paddedExcluded) {
-                adjusted = shiftedDown
-                continue
-            }
-
-            let shiftedLeft = CGRect(
-                x: max(bounds.minX, paddedExcluded.minX - adjusted.width - collisionPadding),
-                y: adjusted.origin.y,
-                width: adjusted.width,
-                height: adjusted.height
-            )
-            if bounds.contains(shiftedLeft) && !shiftedLeft.intersects(paddedExcluded) {
-                adjusted = shiftedLeft
-                continue
-            }
-
-            let shiftedUp = CGRect(
-                x: adjusted.origin.x,
-                y: max(bounds.minY, paddedExcluded.minY - adjusted.height - collisionPadding),
-                width: adjusted.width,
-                height: adjusted.height
-            )
-            if bounds.contains(shiftedUp) && !shiftedUp.intersects(paddedExcluded) {
-                adjusted = shiftedUp
-            }
+        let originX: CGFloat
+        switch direction {
+        case .leftToRight:
+            originX = min(max(source.minX, bounds.minX), bounds.maxX - width)
+        case .rightToLeft:
+            originX = min(max(source.maxX - width, bounds.minX), bounds.maxX - width)
         }
 
-        return adjusted
+        let originY = min(max(source.minY, bounds.minY), bounds.maxY - height)
+        return CGRect(x: originX, y: originY, width: width, height: height)
     }
 
-    private static func combinedSourceRect(
-        for translations: [GlanslateCore.Translation],
-        within bounds: CGRect
-    ) -> CGRect {
-        guard let first = translations.first else { return bounds }
-
-        let union = translations
-            .dropFirst()
-            .reduce(first.block.region.rect) { partial, translation in
-                partial.union(translation.block.region.rect)
-            }
-        let clamped = union.intersection(bounds)
-        if clamped.isNull || clamped.width <= 0 || clamped.height <= 0 {
-            return bounds
+    private static func clamp(_ rect: CGRect, within bounds: CGRect) -> CGRect {
+        guard !rect.isNull, rect.width > 0, rect.height > 0 else {
+            return CGRect(origin: bounds.origin, size: .zero)
         }
-        return clamped
-    }
-}
 
-private extension Array where Element == GlanslateCore.Translation {
-    func sortedForSequentialDisplay() -> [Element] {
-        sorted { lhs, rhs in
-            let left = lhs.block.region.rect
-            let right = rhs.block.region.rect
+        let width = min(rect.width, bounds.width)
+        let height = min(rect.height, bounds.height)
 
-            if abs(left.minY - right.minY) > 6 {
-                return left.minY < right.minY
-            }
-            return left.minX < right.minX
+        var originX = rect.minX
+        if originX + width > bounds.maxX {
+            originX = bounds.maxX - width
         }
+        originX = max(bounds.minX, originX)
+
+        var originY = rect.minY
+        if originY + height > bounds.maxY {
+            originY = bounds.maxY - height
+        }
+        originY = max(bounds.minY, originY)
+
+        return CGRect(x: originX, y: originY, width: width, height: height)
     }
 }
