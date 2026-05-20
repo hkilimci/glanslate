@@ -36,7 +36,9 @@ final class GlanslateAppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.updateDockIconVisibility()
+            MainActor.assumeIsolated {
+                self?.updateDockIconVisibility()
+            }
         }
     }
 

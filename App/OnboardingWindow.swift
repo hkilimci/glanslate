@@ -198,6 +198,7 @@ struct OnboardingWindow: View {
 final class OnboardingWindowController: NSWindowController {
     private let isPresented: Binding<Bool>
     private let onClose: @MainActor () -> Void
+    private var windowDelegate: OnboardingWindowDelegate?
 
     init(
         isPresented: Binding<Bool>,
@@ -217,10 +218,12 @@ final class OnboardingWindowController: NSWindowController {
         let contentView = OnboardingWindow(isPresented: isPresented)
         window.contentView = NSHostingView(rootView: contentView)
         window.setFrameAutosaveName("OnboardingWindow")
-        window.delegate = OnboardingWindowDelegate(
+        let delegate = OnboardingWindowDelegate(
             isPresented: isPresented,
             onClose: onClose
         )
+        self.windowDelegate = delegate
+        window.delegate = delegate
 
         super.init(window: window)
     }

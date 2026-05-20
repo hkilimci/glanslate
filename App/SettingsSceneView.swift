@@ -5,15 +5,25 @@ import SwiftData
 import SwiftUI
 import GlanslateKit
 
-private func persistedBinding<Value>(
+private struct SendableKeyPath<Root, Value>: @unchecked Sendable {
+    let keyPath: ReferenceWritableKeyPath<Root, Value>
+}
+
+@MainActor
+private func persistedBinding<Value: Sendable>(
     settings: SettingsStore,
     _ keyPath: ReferenceWritableKeyPath<SettingsStore, Value>
 ) -> Binding<Value> {
-    Binding(
-        get: { settings[keyPath: keyPath] },
-        set: {
-            settings[keyPath: keyPath] = $0
-            settings.persist()
+    let box = SendableKeyPath(keyPath: keyPath)
+    return Binding(
+        get: {
+            MainActor.assumeIsolated { settings[keyPath: box.keyPath] }
+        },
+        set: { newValue in
+            MainActor.assumeIsolated {
+                settings[keyPath: box.keyPath] = newValue
+                settings.persist()
+            }
         }
     )
 }
