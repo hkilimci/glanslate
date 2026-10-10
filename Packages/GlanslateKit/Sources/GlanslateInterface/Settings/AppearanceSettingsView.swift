@@ -35,6 +35,7 @@ struct AppearanceSettingsView: View {
                     } maximumValueLabel: {
                         Image(systemName: "textformat.size.larger").accessibilityHidden(true)
                     }
+                    .labelsHidden()
                     .frame(maxWidth: 280)
                 }
             } header: {

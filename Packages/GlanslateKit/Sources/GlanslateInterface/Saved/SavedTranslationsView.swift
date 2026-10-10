@@ -54,13 +54,7 @@ private struct SavedTranslationsBrowser: View {
                     }
             }
             .overlay {
-                if items.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Saved Translations", systemImage: "pin")
-                    } description: {
-                        Text("Translations you pin from the overlay toolbar appear here, with the area they came from.")
-                    }
-                } else if filtered.isEmpty {
+                if !items.isEmpty, filtered.isEmpty {
                     ContentUnavailableView.search(text: search)
                 }
             }
@@ -72,16 +66,26 @@ private struct SavedTranslationsBrowser: View {
         } detail: {
             if let item = selectedItem {
                 SavedTranslationDetail(item: item, onDelete: { delete(item) })
-            } else if !items.isEmpty {
+            } else if items.isEmpty {
+                ContentUnavailableView {
+                    Label("No Saved Translations", systemImage: "pin")
+                } description: {
+                    Text("Pin a translation from the overlay toolbar to keep it here, along with the area it came from.")
+                }
+            } else {
                 ContentUnavailableView("Select a Translation", systemImage: "text.bubble", description: Text("Choose a saved translation to see it in full."))
             }
         }
         .navigationTitle("Saved Translations")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Clear All…", systemImage: "trash") { confirmClear = true }
-                    .disabled(items.isEmpty)
-                    .help("Delete all saved translations")
+                Menu {
+                    Button("Clear All Saved Translations…", role: .destructive) { confirmClear = true }
+                        .disabled(items.isEmpty)
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
+                }
+                .help("More")
             }
         }
         .confirmationDialog("Delete all saved translations?", isPresented: $confirmClear) {
@@ -179,8 +183,8 @@ private struct SavedTranslationDetail: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("Copy Translation", systemImage: "doc.on.doc") { Pasteboard.copy(item.translatedText) }
                     .help("Copy Translation")
-                Button("Delete", systemImage: "minus.circle", role: .destructive, action: onDelete)
-                    .help("Delete This Translation")
+                Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
+                    .help("Delete This Translation (⌫)")
             }
         }
     }

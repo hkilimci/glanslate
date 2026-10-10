@@ -155,6 +155,8 @@ final class SelectionView: NSView {
         self.controller = controller
         super.init(frame: CGRect(origin: .zero, size: display.frame.size))
         let host = NSHostingView(rootView: SelectionHintView(model: hintModel))
+        // The hints sit on dimmed content, so they always use the dark appearance.
+        host.appearance = NSAppearance(named: .darkAqua)
         host.translatesAutoresizingMaskIntoConstraints = false
         host.isHidden = true
         addSubview(host)

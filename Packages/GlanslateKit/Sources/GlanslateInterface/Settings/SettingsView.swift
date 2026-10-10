@@ -298,10 +298,10 @@ struct AboutSettingsView: View {
             }
 
             Section("Privacy") {
-                Label("Captures and text recognition never leave your Mac.", systemImage: "lock.shield")
-                Label("Apple Translation works entirely on device.", systemImage: "laptopcomputer")
-                Label("Cloud providers receive only the recognized text, and only after you allow it.", systemImage: "cloud")
-                Label("API keys are kept in your Keychain. Glanslate doesn’t log captured content.", systemImage: "key")
+                PrivacyRow(symbol: "lock.shield", text: "Captures and text recognition never leave your Mac.")
+                PrivacyRow(symbol: "laptopcomputer", text: "Apple Translation works entirely on device.")
+                PrivacyRow(symbol: "cloud", text: "Cloud providers receive only the recognized text, and only after you allow it.")
+                PrivacyRow(symbol: "key", text: "API keys are kept in your Keychain. Glanslate doesn’t log captured content.")
             }
 
             Section("Providers") {
@@ -313,6 +313,21 @@ struct AboutSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private struct PrivacyRow: View {
+        let symbol: String
+        let text: String
+
+        var body: some View {
+            Label {
+                Text(text)
+            } icon: {
+                Image(systemName: symbol)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22)
+            }
+        }
     }
 
     static var version: String {

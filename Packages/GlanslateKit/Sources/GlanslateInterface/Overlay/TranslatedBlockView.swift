@@ -105,7 +105,7 @@ struct TranslatedBlockView: View {
                     if let image = backdrop?.blurred {
                         Image(decorative: image, scale: 1).resizable()
                     }
-                    tint.opacity(contrast == .increased || reduceTransparency ? 0.7 : 0.35)
+                    tint.opacity(contrast == .increased || reduceTransparency ? 0.75 : 0.5)
                 }
             }
             .clipShape(shape)
@@ -122,7 +122,17 @@ struct TranslatedBlockView: View {
             .foregroundStyle(subtitle.textColor.color)
             .fontWeight(.medium)
             .modifier(OutlineModifier(color: outline, width: width, isEnabled: subtitle.showsOutline))
-            .background(background.color, in: shape)
+            .background {
+                // The blurred original sits under translucent backgrounds so source
+                // glyphs never ghost through the caption.
+                ZStack {
+                    if background.alpha > 0, background.alpha < 1, let image = backdrop?.blurred {
+                        Image(decorative: image, scale: 1).resizable()
+                    }
+                    background.color
+                }
+                .clipShape(shape)
+            }
             .overlay {
                 if subtitle.showsBorder {
                     shape.strokeBorder(subtitle.borderColor.color, lineWidth: 1)

@@ -103,7 +103,7 @@ public struct SubtitleAppearance: Codable, Hashable, Sendable {
     public var borderColor: RGBAColor
 
     public init(
-        backgroundColor: RGBAColor = RGBAColor.black.withAlpha(0.78),
+        backgroundColor: RGBAColor = RGBAColor.black.withAlpha(0.85),
         textColor: RGBAColor = .white,
         showsOutline: Bool = false,
         outlineColor: RGBAColor = .black,
