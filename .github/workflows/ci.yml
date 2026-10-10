@@ -10,6 +10,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   core-linux:
     name: Core tests (Linux)
@@ -30,18 +34,23 @@ jobs:
         run: |
           xcodebuild -version
           swift --version
+      - name: Build package
+        run: |
+          if ! swift build --build-tests --package-path Packages/GlanslateKit > package-build.log 2>&1; then
+            echo "::group::Full build log"; cat package-build.log; echo "::endgroup::"
+            echo "Error summary:"; grep -E "error:" package-build.log | sort -u | head -120
+            exit 1
+          fi
       - name: Test package
-        run: swift test --package-path Packages/GlanslateKit 2>&1 | tee package-test.log
+        run: swift test --skip-build --package-path Packages/GlanslateKit 2>&1 | tail -60
       - name: Build app
         if: hashFiles('Glanslate.xcodeproj/project.pbxproj') != ''
         run: |
-          set -o pipefail
-          xcodebuild -project Glanslate.xcodeproj -scheme Glanslate -configuration Debug \
-            -destination 'platform=macOS' -derivedDataPath build \
-            CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build 2>&1 | tee app-build.log | xcbeautify
-      - name: Upload logs
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs
-          path: "*.log"
+          if ! xcodebuild -project Glanslate.xcodeproj -scheme Glanslate -configuration Debug \
+              -destination 'platform=macOS' -derivedDataPath build \
+              CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build > app-build.log 2>&1; then
+            echo "::group::Full build log"; cat app-build.log; echo "::endgroup::"
+            echo "Error summary:"; grep -E "error:|\*\* BUILD FAILED" app-build.log | sort -u | head -120
+            exit 1
+          fi
+          grep -E "warning:" app-build.log | sort -u | head -60 || true

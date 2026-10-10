@@ -10,7 +10,7 @@ public enum ToolbarPlacement {
         case below, above, inside
     }
 
-    public struct Result: Equatable, Sendable {
+    public struct Placement: Equatable, Sendable {
         public let frame: CGRect
         public let edge: Edge
     }
@@ -21,20 +21,20 @@ public enum ToolbarPlacement {
         within visibleFrame: CGRect,
         gap: CGFloat = 10,
         margin: CGFloat = 8
-    ) -> Result {
+    ) -> Placement {
         let minX = visibleFrame.minX + margin
         let maxX = visibleFrame.maxX - margin - size.width
         let x = maxX >= minX ? min(max(region.midX - size.width / 2, minX), maxX) : visibleFrame.midX - size.width / 2
 
         let belowY = region.minY - gap - size.height
         if belowY >= visibleFrame.minY + margin {
-            return Result(frame: CGRect(x: x, y: belowY, width: size.width, height: size.height).integral, edge: .below)
+            return Placement(frame: CGRect(x: x, y: belowY, width: size.width, height: size.height).integral, edge: .below)
         }
         let aboveY = region.maxY + gap
         if aboveY + size.height <= visibleFrame.maxY - margin {
-            return Result(frame: CGRect(x: x, y: aboveY, width: size.width, height: size.height).integral, edge: .above)
+            return Placement(frame: CGRect(x: x, y: aboveY, width: size.width, height: size.height).integral, edge: .above)
         }
         let insideY = max(region.minY, visibleFrame.minY) + gap
-        return Result(frame: CGRect(x: x, y: insideY, width: size.width, height: size.height).integral, edge: .inside)
+        return Placement(frame: CGRect(x: x, y: insideY, width: size.width, height: size.height).integral, edge: .inside)
     }
 }
