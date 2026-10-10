@@ -15,6 +15,14 @@ public struct OverlayBlockLayout: Equatable, Sendable, Identifiable {
     public let padding: CGSize
     /// True when even the smallest size couldn't fit without clipping.
     public let isCompressed: Bool
+
+    public init(id: UUID, frame: CGRect, fontSize: CGFloat, padding: CGSize, isCompressed: Bool) {
+        self.id = id
+        self.frame = frame
+        self.fontSize = fontSize
+        self.padding = padding
+        self.isCompressed = isCompressed
+    }
 }
 
 public struct OverlayLayoutInput: Equatable, Sendable {

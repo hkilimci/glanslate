@@ -1,17 +1,22 @@
-# IDE
+# Xcode
+DerivedData/
+build/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+Configs/Local.xcconfig
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/GlanslateKit/.swiftpm/
+
+# Editors and OS
 .idea/
 .vscode/
-.build/
-DerivedData/
-*.xcodeproj/xcuserdata/
-*.xcworkspace/xcuserdata/
 *.swp
 *.swo
 *~
 .DS_Store
-
-# Logs
-*.log
-
-# OS
 Thumbs.db
+*.log

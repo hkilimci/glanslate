@@ -1,0 +1,276 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		6A1E00000000000000000001 /* GlanslateInterface in Frameworks */ = {isa = PBXBuildFile; productRef = 6A1E00000000000000000020 /* GlanslateInterface */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		6A1E00000000000000000002 /* Glanslate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Glanslate.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6A1E00000000000000000003 /* Glanslate.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Glanslate.xcconfig; sourceTree = "<group>"; };
+		6A1E00000000000000000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		6A1E00000000000000000005 /* Glanslate.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Glanslate.entitlements; sourceTree = "<group>"; };
+		6A1E00000000000000000006 /* GlanslateKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = GlanslateKit; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		6A1E00000000000000000007 /* Glanslate */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Glanslate;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		6A1E00000000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A1E00000000000000000001 /* GlanslateInterface in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		6A1E00000000000000000009 = {
+			isa = PBXGroup;
+			children = (
+				6A1E00000000000000000007 /* Glanslate */,
+				6A1E0000000000000000000A /* Configs */,
+				6A1E0000000000000000000B /* Packages */,
+				6A1E0000000000000000000C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6A1E0000000000000000000A /* Configs */ = {
+			isa = PBXGroup;
+			children = (
+				6A1E00000000000000000003 /* Glanslate.xcconfig */,
+				6A1E00000000000000000004 /* Info.plist */,
+				6A1E00000000000000000005 /* Glanslate.entitlements */,
+			);
+			path = Configs;
+			sourceTree = "<group>";
+		};
+		6A1E0000000000000000000B /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				6A1E00000000000000000006 /* GlanslateKit */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		6A1E0000000000000000000C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				6A1E00000000000000000002 /* Glanslate.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		6A1E0000000000000000000D /* Glanslate */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6A1E00000000000000000010 /* Build configuration list for PBXNativeTarget "Glanslate" */;
+			buildPhases = (
+				6A1E0000000000000000000E /* Sources */,
+				6A1E00000000000000000008 /* Frameworks */,
+				6A1E0000000000000000000F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				6A1E00000000000000000007 /* Glanslate */,
+			);
+			name = Glanslate;
+			packageProductDependencies = (
+				6A1E00000000000000000020 /* GlanslateInterface */,
+			);
+			productName = Glanslate;
+			productReference = 6A1E00000000000000000002 /* Glanslate.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		6A1E00000000000000000011 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					6A1E0000000000000000000D = {
+						CreatedOnToolsVersion = 26.0;
+					};
+				};
+			};
+			buildConfigurationList = 6A1E00000000000000000012 /* Build configuration list for PBXProject "Glanslate" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 6A1E00000000000000000009;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6A1E00000000000000000021 /* XCLocalSwiftPackageReference "Packages/GlanslateKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 6A1E0000000000000000000C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6A1E0000000000000000000D /* Glanslate */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6A1E0000000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6A1E0000000000000000000E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		6A1E00000000000000000013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		6A1E00000000000000000014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		6A1E00000000000000000015 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6A1E00000000000000000003 /* Glanslate.xcconfig */;
+			buildSettings = {
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+			};
+			name = Debug;
+		};
+		6A1E00000000000000000016 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6A1E00000000000000000003 /* Glanslate.xcconfig */;
+			buildSettings = {
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		6A1E00000000000000000010 /* Build configuration list for PBXNativeTarget "Glanslate" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A1E00000000000000000015 /* Debug */,
+				6A1E00000000000000000016 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6A1E00000000000000000012 /* Build configuration list for PBXProject "Glanslate" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A1E00000000000000000013 /* Debug */,
+				6A1E00000000000000000014 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		6A1E00000000000000000021 /* XCLocalSwiftPackageReference "Packages/GlanslateKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/GlanslateKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6A1E00000000000000000020 /* GlanslateInterface */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GlanslateInterface;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 6A1E00000000000000000011 /* Project object */;
+}

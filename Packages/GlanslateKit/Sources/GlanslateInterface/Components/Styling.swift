@@ -18,7 +18,7 @@ extension RGBAColor {
 
 /// A `Binding<Color>` over a stored `RGBAColor`, for `ColorPicker`.
 extension Binding where Value == RGBAColor {
-    var color: Binding<Color> {
+    var colorBinding: Binding<Color> {
         Binding<Color>(get: { wrappedValue.color }, set: { wrappedValue = RGBAColor($0) })
     }
 }

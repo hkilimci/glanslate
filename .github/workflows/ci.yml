@@ -54,3 +54,14 @@ jobs:
             exit 1
           fi
           grep -E "warning:" app-build.log | sort -u | head -60 || true
+      - name: Test scheme
+        if: hashFiles('Glanslate.xcodeproj/project.pbxproj') != ''
+        run: |
+          if ! xcodebuild -project Glanslate.xcodeproj -scheme Glanslate -configuration Debug \
+              -destination 'platform=macOS' -derivedDataPath build \
+              CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO test > app-test.log 2>&1; then
+            echo "::group::Full test log"; cat app-test.log; echo "::endgroup::"
+            echo "Error summary:"; grep -E "error:|failed|\*\* TEST FAILED" app-test.log | sort -u | head -80
+            exit 1
+          fi
+          grep -E "Test run with|Executed" app-test.log | tail -5
