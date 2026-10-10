@@ -373,15 +373,17 @@ final class SelectionHintModel {
 }
 
 /// The compact keyboard hint capsule shown at the bottom of the screen.
+/// It always sits on dimmed content, so it uses light text on dark glass.
 struct SelectionHintView: View {
     let model: SelectionHintModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         HStack(spacing: 14) {
             if let message = model.message {
                 Label(message, systemImage: "exclamationmark.circle")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
                     .transition(.opacity)
             } else {
                 hint(model.mode == .area ? "Drag to select text" : "Click a window to translate it", keys: [])
@@ -392,6 +394,7 @@ struct SelectionHintView: View {
         .font(.system(size: 12.5))
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
+        .background(Color.black.opacity(reduceTransparency ? 0.85 : 0.45), in: .capsule)
         .glassEffect(.regular, in: .capsule)
         .environment(\.colorScheme, .dark)
         .animation(MotionAwareAnimation.standard(reduceMotion), value: model.message)
@@ -401,8 +404,15 @@ struct SelectionHintView: View {
 
     private func hint(_ text: String, keys: [String]) -> some View {
         HStack(spacing: 5) {
-            ForEach(keys, id: \.self) { KeyCap($0) }
-            Text(text).foregroundStyle(.secondary)
+            ForEach(keys, id: \.self) { key in
+                Text(key)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .frame(minWidth: 20, minHeight: 18)
+                    .background(Color.white.opacity(0.18), in: .rect(cornerRadius: 4, style: .continuous))
+            }
+            Text(text).foregroundStyle(Color.white.opacity(0.8))
         }
     }
 }

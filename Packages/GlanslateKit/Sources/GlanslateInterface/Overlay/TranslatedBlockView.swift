@@ -65,16 +65,18 @@ struct TranslatedBlockView: View {
 
     @ViewBuilder
     private func glass(_ content: some View) -> some View {
-        let scheme: ColorScheme = (backdrop?.isLight ?? true) ? .light : .dark
+        let isLight = backdrop?.isLight ?? true
+        let scheme: ColorScheme = isLight ? .light : .dark
+        let ink = isLight ? Color.black.opacity(0.86) : Color.white.opacity(0.95)
         if reduceTransparency {
             content
-                .foregroundStyle(.primary)
-                .background(Color(nsColor: .windowBackgroundColor), in: shape)
-                .overlay { shape.strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1) }
+                .foregroundStyle(ink)
+                .background(isLight ? Color.white : Color(white: 0.12), in: shape)
+                .overlay { shape.strokeBorder(ink.opacity(0.25), lineWidth: 1) }
                 .environment(\.colorScheme, scheme)
         } else {
             content
-                .foregroundStyle(.primary)
+                .foregroundStyle(ink)
                 .background {
                     // The blurred original keeps source glyphs from showing through the glass.
                     if let image = backdrop?.blurred {
@@ -85,7 +87,7 @@ struct TranslatedBlockView: View {
                 .glassEffect(.regular, in: shape)
                 .overlay {
                     if contrast == .increased {
-                        shape.strokeBorder(Color.primary.opacity(0.45), lineWidth: 1)
+                        shape.strokeBorder(ink.opacity(0.5), lineWidth: 1)
                     }
                 }
                 .environment(\.colorScheme, scheme)

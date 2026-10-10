@@ -63,6 +63,11 @@ struct InterfaceSnapshotTests {
                 let scene = OverlayScene.make(style: style, darkContent: darkContent, settings: environment.settings)
                 try render(scene.view, size: scene.size, dark: darkContent, name: "overlay-\(style.rawValue)", titled: false)
             }
+            // A light-mode Mac reading dark content, and the reverse.
+            let mixedEnvironment = try Fixtures.environment()
+            let mixed = OverlayScene.make(style: .liquidGlass, darkContent: darkContent, settings: mixedEnvironment.settings)
+            try render(mixed.view, size: mixed.size, dark: !darkContent, name: "overlay-liquidGlass-\(darkContent ? "darkcontent" : "lightcontent")-mixed", titled: false)
+
             let environment = try Fixtures.environment()
             let failing = OverlayScene.make(style: .liquidGlass, darkContent: darkContent, settings: environment.settings, error: .languageModelsNotInstalled(source: .french, target: .english))
             try render(failing.view, size: failing.size, dark: darkContent, name: "overlay-error", titled: false)
