@@ -283,7 +283,7 @@ private struct TranslationStep: View {
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(maxWidth: 440, maxHeight: 130)
+            .frame(maxWidth: 440, maxHeight: 112)
 
             Text(providerNote(settings.preferredProvider))
                 .font(.callout)

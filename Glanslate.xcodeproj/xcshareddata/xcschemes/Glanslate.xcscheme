@@ -59,6 +59,16 @@
                ReferencedContainer = "container:Packages/GlanslateKit">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "GlanslateInterfaceTests"
+               BuildableName = "GlanslateInterfaceTests"
+               BlueprintName = "GlanslateInterfaceTests"
+               ReferencedContainer = "container:Packages/GlanslateKit">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
