@@ -5,7 +5,7 @@ import Foundation
 /// Works in AppKit global space (y grows up). The toolbar prefers the space
 /// below the region, then above it, and only overlaps the region's bottom edge
 /// when the region fills the display.
-public enum ToolbarPlacement {
+public enum FloatingToolbarPlacement {
     public enum Edge: Equatable, Sendable {
         case below, above, inside
     }

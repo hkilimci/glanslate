@@ -131,7 +131,7 @@ public final class AppController: NSObject {
             shortcutToken = try HotKeyCenter.shared.register(combo) { [weak self] in
                 self?.translateRegion()
             }
-        } catch .unavailable {
+        } catch HotKeyCenter.RegistrationError.unavailable {
             environment.shortcutProblem = "\(combo.displayString) is already used by another app. Choose a different shortcut."
         } catch {
             environment.shortcutProblem = "\(combo.displayString) couldn’t be registered. Choose a different shortcut."

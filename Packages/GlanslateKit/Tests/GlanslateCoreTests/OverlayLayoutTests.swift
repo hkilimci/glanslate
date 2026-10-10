@@ -67,29 +67,29 @@ struct ToolbarPlacementTests {
     let size = CGSize(width: 420, height: 44)
 
     @Test func prefersBelowTheRegion() {
-        let result = ToolbarPlacement.place(toolbar: size, near: CGRect(x: 300, y: 400, width: 400, height: 200), within: screen)
+        let result = FloatingToolbarPlacement.place(toolbar: size, near: CGRect(x: 300, y: 400, width: 400, height: 200), within: screen)
         #expect(result.edge == .below)
         #expect(result.frame.maxY <= 400 - 10)
         #expect(result.frame.midX == 500)
     }
 
     @Test func movesAboveWhenThereIsNoRoomBelow() {
-        let result = ToolbarPlacement.place(toolbar: size, near: CGRect(x: 300, y: 20, width: 400, height: 200), within: screen)
+        let result = FloatingToolbarPlacement.place(toolbar: size, near: CGRect(x: 300, y: 20, width: 400, height: 200), within: screen)
         #expect(result.edge == .above)
         #expect(result.frame.minY >= 230)
     }
 
     @Test func overlapsOnlyWhenTheRegionFillsTheScreen() {
-        let result = ToolbarPlacement.place(toolbar: size, near: screen, within: screen)
+        let result = FloatingToolbarPlacement.place(toolbar: size, near: screen, within: screen)
         #expect(result.edge == .inside)
         #expect(screen.contains(result.frame))
     }
 
     @Test func staysOnScreenHorizontally() {
-        let result = ToolbarPlacement.place(toolbar: size, near: CGRect(x: 1400, y: 400, width: 40, height: 40), within: screen)
+        let result = FloatingToolbarPlacement.place(toolbar: size, near: CGRect(x: 1400, y: 400, width: 40, height: 40), within: screen)
         #expect(result.frame.maxX <= screen.maxX - 8)
         let negative = CGRect(x: -1920, y: 0, width: 1920, height: 1080)
-        let left = ToolbarPlacement.place(toolbar: size, near: CGRect(x: -1920, y: 500, width: 50, height: 50), within: negative)
+        let left = FloatingToolbarPlacement.place(toolbar: size, near: CGRect(x: -1920, y: 500, width: 50, height: 50), within: negative)
         #expect(left.frame.minX >= negative.minX + 8)
     }
 }

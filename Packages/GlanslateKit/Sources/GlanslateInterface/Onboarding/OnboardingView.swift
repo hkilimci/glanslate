@@ -26,10 +26,7 @@ struct OnboardingView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 48)
             .padding(.top, 36)
-            .transition(reduceMotion ? .opacity : .asymmetric(
-                insertion: .opacity.combined(with: .offset(x: 24)),
-                removal: .opacity.combined(with: .offset(x: -24))
-            ))
+            .transition(stepTransition)
             .id(step)
 
             footer
@@ -70,6 +67,14 @@ struct OnboardingView: View {
         .padding(.vertical, 18)
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
+    }
+
+    private var stepTransition: AnyTransition {
+        guard !reduceMotion else { return AnyTransition.opacity }
+        return AnyTransition.asymmetric(
+            insertion: AnyTransition.opacity.combined(with: AnyTransition.offset(x: 24)),
+            removal: AnyTransition.opacity.combined(with: AnyTransition.offset(x: -24))
+        )
     }
 
     private var primaryTitle: String {

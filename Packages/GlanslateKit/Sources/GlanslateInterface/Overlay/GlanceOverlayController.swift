@@ -138,7 +138,7 @@ final class GlanceOverlayController {
 
     private func placeToolbar(size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
-        let placement = ToolbarPlacement.place(toolbar: size, near: session.appKitFrame, within: session.display.visibleFrame)
+        let placement = FloatingToolbarPlacement.place(toolbar: size, near: session.appKitFrame, within: session.display.visibleFrame)
         if toolbarContext.edge != placement.edge { toolbarContext.edge = placement.edge }
         toolbarPanel.setFrame(placement.frame, display: true)
     }

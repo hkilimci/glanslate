@@ -30,7 +30,7 @@ final class ToastPresenter {
         let visible = screen.visibleFrame
         let frame: CGRect
         if let anchor, anchor.intersects(visible) {
-            frame = ToolbarPlacement.place(toolbar: size, near: anchor, within: visible).frame
+            frame = FloatingToolbarPlacement.place(toolbar: size, near: anchor, within: visible).frame
         } else {
             frame = CGRect(x: visible.midX - size.width / 2, y: visible.maxY - size.height - 12, width: size.width, height: size.height)
         }

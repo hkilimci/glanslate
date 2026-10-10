@@ -5,7 +5,7 @@ import Foundation
 /// AppKit and Quartz global space share x; y is mirrored around the primary
 /// display's height. Display-local space is relative to one display's top-left
 /// corner, which also works for displays at negative global coordinates.
-public struct CoordinateSpace: Sendable {
+public struct ScreenCoordinateSpace: Sendable {
     public let layout: DisplayLayout
 
     public init(layout: DisplayLayout) {

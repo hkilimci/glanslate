@@ -135,9 +135,10 @@ struct AppleTranslationSection: View {
             app.pendingDownload = nil
         }
         .translationTask(configuration) { session in
-            nonisolated(unsafe) let session = session
+            // The session is used only here, on the main actor, while the view is alive.
+            nonisolated(unsafe) let downloadSession = session
             do {
-                try await session.prepareTranslation()
+                try await downloadSession.prepareTranslation()
                 downloadError = nil
             } catch {
                 downloadError = "The download didn’t finish. Check your connection and try again."

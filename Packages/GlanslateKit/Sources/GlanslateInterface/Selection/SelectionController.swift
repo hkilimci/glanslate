@@ -98,7 +98,7 @@ final class SelectionController {
 
     /// The frontmost window under a display-local point, clipped to that display.
     fileprivate func window(at point: CGPoint, on display: DisplayDescriptor) -> (id: UInt32, rect: CGRect)? {
-        let space = CoordinateSpace(layout: layout)
+        let space = ScreenCoordinateSpace(layout: layout)
         for window in windows {
             let local = space.localRect(fromQuartz: window.quartzFrame, on: display)
             guard local.contains(point),

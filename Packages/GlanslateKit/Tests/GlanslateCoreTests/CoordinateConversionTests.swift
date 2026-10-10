@@ -8,7 +8,7 @@ private let primary = DisplayDescriptor(id: 1, frame: CGRect(x: 0, y: 0, width: 
 private let left = DisplayDescriptor(id: 2, frame: CGRect(x: -1920, y: -300, width: 1920, height: 1080), scale: 1)
 private let above = DisplayDescriptor(id: 3, frame: CGRect(x: 200, y: 982, width: 2560, height: 1440), scale: 2)
 private let layout = DisplayLayout(displays: [left, primary, above])
-private let space = CoordinateSpace(layout: layout)
+private let space = ScreenCoordinateSpace(layout: layout)
 
 @Suite("Coordinate conversion")
 struct CoordinateConversionTests {

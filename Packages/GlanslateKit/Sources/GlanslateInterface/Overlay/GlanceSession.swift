@@ -73,7 +73,7 @@ final class GlanceSession: Identifiable {
 
     /// The region in AppKit global coordinates.
     var appKitFrame: CGRect {
-        CoordinateSpace(layout: layout).appKitRect(fromLocal: region.rect, on: display)
+        ScreenCoordinateSpace(layout: layout).appKitRect(fromLocal: region.rect, on: display)
     }
 
     var detectedLanguage: Language? { recognized?.detectedLanguage?.language }

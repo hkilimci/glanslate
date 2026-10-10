@@ -18,7 +18,7 @@ struct GlanceToolbarActions {
 @MainActor
 @Observable
 final class ToolbarContext {
-    var edge: ToolbarPlacement.Edge = .below
+    var edge: FloatingToolbarPlacement.Edge = .below
     var configuredProviders: Set<TranslationProvider> = [.apple]
     var revealModifier: RevealModifier = .option
     var canPin = true

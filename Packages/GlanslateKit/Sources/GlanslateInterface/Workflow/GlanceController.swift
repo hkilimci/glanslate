@@ -102,7 +102,7 @@ final class GlanceController {
             session.phase = .recognizing
 
             let quartzRect = settings.usesAccessibilityText && AccessibilityTextReader.isAvailable
-                ? CoordinateSpace(layout: layout).quartzRect(for: target.region)
+                ? ScreenCoordinateSpace(layout: layout).quartzRect(for: target.region)
                 : nil
             let recognized = try await recognizer.recognize(
                 image: capture.cgImage,
