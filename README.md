@@ -9,6 +9,16 @@ Press **⇧⌘T**, drag over text in a browser, PDF, image, or app (or press Spa
 - Capture (ScreenCaptureKit) and text recognition (Vision) never leave your Mac.
 - Translation through Apple Translation (on device), DeepL, Google Cloud Translation, or OpenAI, with a fallback you control.
 
+| Liquid Glass | Blur Patch (dark content) | Subtitle |
+|---|---|---|
+| ![Liquid Glass overlay](Docs/Screenshots/overlay-liquidGlass-light.png) | ![Blur Patch overlay](Docs/Screenshots/overlay-blurPatch-dark.png) | ![Subtitle overlay](Docs/Screenshots/overlay-subtitle-light.png) |
+
+| Actionable errors | Onboarding | Selection hints |
+|---|---|---|
+| ![Error with a download action](Docs/Screenshots/overlay-error-light.png) | ![Permissions step](Docs/Screenshots/onboarding-1-light.png) | ![Selection hints](Docs/Screenshots/selection-hint-light.png) |
+
+These images are rendered by CI on macOS 26 (see *Tests*). The offscreen renderer can't draw system materials, so glass looks flatter than on screen and the sidebars of the Settings and Saved Translations windows come out blank.
+
 ## Requirements
 
 - macOS 26 or later
@@ -160,7 +170,7 @@ On macOS this runs every suite. On Linux it runs the GlanslateCore suites. In Xc
 - **Persistence.** Save, update, search, delete, and clear all.
 - **Settings.** Persistence and hot key modifiers.
 
-CI (`.github/workflows/ci.yml`) runs the core tests on Linux and, on a macOS 26 runner, the full package tests, the app build, and the scheme tests. It also renders every Settings section, each onboarding step, Saved Translations, the three overlay styles, and the selection hints in light and dark appearance, and uploads them as the `interface-snapshots` artifact for visual review. To render them locally:
+CI (`.github/workflows/ci.yml`) runs the core tests on Linux and, on a macOS 26 runner, the full package tests, the app build, and the scheme tests. It also renders every Settings section, each onboarding step, Saved Translations, the three overlay styles, and the selection hints in light and dark appearance, and uploads them as the `interface-snapshots` artifact for visual review. Include `[snapshots]` in a commit message to have CI refresh `Docs/Screenshots`. To render them locally:
 
 ```sh
 GLANSLATE_SNAPSHOTS=/tmp/glanslate-snapshots swift test --package-path Packages/GlanslateKit --filter InterfaceSnapshotTests
