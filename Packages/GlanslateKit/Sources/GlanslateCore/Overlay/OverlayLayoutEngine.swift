@@ -110,33 +110,37 @@ public struct OverlayLayoutEngine: Sendable {
             measurer.size(of: input.text, fontSize: size, width: max(1, width - 2 * padding.width)).height + 2 * padding.height
         }
 
-        // 1. Fit inside the original area (widening labels first), shrinking modestly.
-        for size in sizes(from: base, to: max(minimumFontSize, base * preferredMinimumScale)) {
-            for width in widths where neededHeight(size, width) <= frame.height + 0.5 {
-                return OverlayBlockLayout(
-                    id: input.id,
-                    frame: CGRect(x: frame.minX, y: frame.minY, width: width, height: frame.height),
-                    fontSize: size,
-                    padding: padding,
-                    isCompressed: false
-                )
+        // 1. Fit inside the original area, shrinking modestly. A wider frame is
+        //    used only when it allows a larger size than the original width.
+        let modest = sizes(from: base, to: max(minimumFontSize, base * preferredMinimumScale))
+        var best: (size: CGFloat, width: CGFloat)?
+        for width in widths {
+            if let size = largestFitting(modest, fits: { neededHeight($0, width) <= frame.height + 0.5 }),
+               size > (best?.size ?? 0) {
+                best = (size, width)
             }
+        }
+        if let best {
+            return OverlayBlockLayout(
+                id: input.id,
+                frame: CGRect(x: frame.minX, y: frame.minY, width: best.width, height: frame.height),
+                fontSize: best.size,
+                padding: padding,
+                isCompressed: false
+            )
         }
 
         // 2. Borrow space below, down to the next block or the region edge.
         let width = widths.last ?? frame.width
         let maxHeight = max(frame.height, bottomLimit - frame.minY)
-        for size in sizes(from: base, to: minimumFontSize) {
-            let height = neededHeight(size, width)
-            if height <= maxHeight {
-                return OverlayBlockLayout(
-                    id: input.id,
-                    frame: CGRect(x: frame.minX, y: frame.minY, width: width, height: max(height, frame.height)),
-                    fontSize: size,
-                    padding: padding,
-                    isCompressed: false
-                )
-            }
+        if let size = largestFitting(sizes(from: base, to: minimumFontSize), fits: { neededHeight($0, width) <= maxHeight }) {
+            return OverlayBlockLayout(
+                id: input.id,
+                frame: CGRect(x: frame.minX, y: frame.minY, width: width, height: max(neededHeight(size, width), frame.height)),
+                fontSize: size,
+                padding: padding,
+                isCompressed: false
+            )
         }
 
         // 3. Smallest readable size, using every point available.
@@ -148,6 +152,23 @@ public struct OverlayLayoutEngine: Sendable {
             padding: padding,
             isCompressed: true
         )
+    }
+
+    /// The largest size that fits, by binary search over sizes in descending
+    /// order. Text never grows taller when its font shrinks, so `fits` is monotonic.
+    private func largestFitting(_ sizes: [CGFloat], fits: (CGFloat) -> Bool) -> CGFloat? {
+        var low = 0, high = sizes.count - 1
+        var answer: CGFloat?
+        while low <= high {
+            let middle = (low + high) / 2
+            if fits(sizes[middle]) {
+                answer = sizes[middle]
+                high = middle - 1
+            } else {
+                low = middle + 1
+            }
+        }
+        return answer
     }
 
     private func sizes(from upper: CGFloat, to lower: CGFloat) -> [CGFloat] {

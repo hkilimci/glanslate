@@ -123,17 +123,6 @@ struct InterfaceSnapshotTests {
     }
 }
 
-/// Keeps snapshot rendering away from the real Keychain.
-final class InMemoryCredentialStore: CredentialStoring, @unchecked Sendable {
-    private let lock = NSLock()
-    private var values: [TranslationProvider: String] = [:]
-
-    func credential(for provider: TranslationProvider) -> String? { lock.withLock { values[provider] } }
-    func hasCredential(for provider: TranslationProvider) -> Bool { credential(for: provider) != nil }
-    func setCredential(_ value: String, for provider: TranslationProvider) throws { lock.withLock { values[provider] = value } }
-    func removeCredential(for provider: TranslationProvider) throws { _ = lock.withLock { values.removeValue(forKey: provider) } }
-}
-
 // MARK: - Fixtures
 
 @MainActor
@@ -145,7 +134,7 @@ enum Fixtures {
         return AppEnvironment(
             settings: settings,
             permissions: PermissionMonitor(),
-            credentials: InMemoryCredentialStore(),
+            credentials: PreviewCredentialStore(),
             store: try SavedTranslationStore(inMemory: true)
         )
     }
