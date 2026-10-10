@@ -19,11 +19,13 @@ public final class AppController: NSObject {
     override public init() {
         let settings = AppSettings()
         let store: SavedTranslationStore?
+        var storeIsTemporary = false
         do {
             store = try SavedTranslationStore()
         } catch {
             Self.log.error("Saved translations unavailable: \(String(describing: type(of: error)), privacy: .public)")
             store = try? SavedTranslationStore(inMemory: true)
+            storeIsTemporary = store != nil
         }
         environment = AppEnvironment(
             settings: settings,
@@ -31,6 +33,7 @@ public final class AppController: NSObject {
             credentials: KeychainCredentialStore(),
             store: store
         )
+        environment.isStoreTemporary = storeIsTemporary
         windows = WindowRouter(environment: environment)
         super.init()
         glance = GlanceController(

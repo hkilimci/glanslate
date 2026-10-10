@@ -31,6 +31,9 @@ public enum GlanslateError: Error, Hashable, Sendable {
     case incompleteResponse(TranslationProvider)
     case noProviderAvailable
 
+    // Saved Translations
+    case saveFailed
+
     case cancelled
 
     public enum NetworkFailure: String, Hashable, Sendable {
@@ -83,6 +86,7 @@ extension GlanslateError: LocalizedError {
         case .providerFailure(let provider, _): return "\(provider.displayName) couldn’t translate"
         case .incompleteResponse(let provider): return "\(provider.displayName) returned an incomplete result"
         case .noProviderAvailable: return "No translation provider available"
+        case .saveFailed: return "Couldn’t save the translation"
         case .cancelled: return "Cancelled"
         }
     }
@@ -142,6 +146,8 @@ extension GlanslateError: LocalizedError {
             return "Some text wasn’t translated. Try again or choose another provider."
         case .noProviderAvailable:
             return "Set up a provider in Settings › Translation."
+        case .saveFailed:
+            return "Saved Translations isn’t available right now. Try again, or restart Glanslate."
         case .cancelled:
             return ""
         }
@@ -160,6 +166,7 @@ extension GlanslateError: LocalizedError {
             return .openProviderSettings(provider)
         case .rateLimited, .network, .providerFailure, .incompleteResponse: return .retry
         case .noProviderAvailable: return .openProviderSettings(.deepL)
+        case .saveFailed: return nil
         case .cancelled: return nil
         }
     }

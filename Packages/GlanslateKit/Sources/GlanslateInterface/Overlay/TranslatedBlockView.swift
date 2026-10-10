@@ -39,7 +39,8 @@ struct TranslatedBlockView: View {
     private var label: some View {
         Text(text)
             .font(.system(size: layout.fontSize))
-            .multilineTextAlignment(isRightToLeft ? .trailing : .leading)
+            // `.leading` follows the layout direction set below, so it is the right edge for RTL.
+            .multilineTextAlignment(.leading)
             .minimumScaleFactor(0.8)
             .textSelection(.enabled)
             .padding(.horizontal, layout.padding.width)
@@ -47,7 +48,7 @@ struct TranslatedBlockView: View {
             .frame(
                 maxWidth: .infinity,
                 maxHeight: .infinity,
-                alignment: isSingleLine ? (isRightToLeft ? .trailing : .leading) : (isRightToLeft ? .topTrailing : .topLeading)
+                alignment: isSingleLine ? .leading : .topLeading
             )
             .environment(\.layoutDirection, isRightToLeft ? .rightToLeft : .leftToRight)
     }

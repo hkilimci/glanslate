@@ -243,7 +243,12 @@ struct SavedSettingsView: View {
                 LabeledContent("Saved translations", value: count.formatted())
                 Toggle("Save an image of the captured area", isOn: $settings.savesThumbnails)
             } footer: {
-                Text("Pin a translation from the overlay toolbar to keep it. Saved translations are stored only on this Mac.")
+                if app.isStoreTemporary {
+                    Label("Glanslate couldn’t open its saved translations file, so new pins last only until you quit. Restart Glanslate to try again.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                } else {
+                    Text("Pin a translation from the overlay toolbar to keep it. Saved translations are stored only on this Mac.")
+                }
             }
 
             Section {

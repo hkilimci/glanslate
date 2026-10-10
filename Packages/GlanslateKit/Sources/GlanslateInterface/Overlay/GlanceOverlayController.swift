@@ -69,6 +69,8 @@ final class GlanceOverlayController {
         canvasPanel.setFrame(regionFrame, display: false)
 
         toolbarPanel = OverlayPanel(frame: CGRect(x: regionFrame.midX, y: regionFrame.minY, width: 10, height: 10))
+        // Keep the toolbar above the translation even when it overlaps a full-display region.
+        toolbarPanel.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
         toolbarContext.revealModifier = settings.revealModifier
         let toolbar = SelfSizingHostingView(rootView: GlanceToolbar(session: session, context: toolbarContext, actions: actions))
         toolbar.sizingOptions = [.intrinsicContentSize]
@@ -114,8 +116,23 @@ final class GlanceOverlayController {
     }
 
     func setConfiguredProviders(_ providers: Set<TranslationProvider>, canPin: Bool) {
-        toolbarContext.configuredProviders = providers
+        if toolbarContext.configuredProviders != providers { toolbarContext.configuredProviders = providers }
         toolbarContext.canPin = canPin
+        if toolbarContext.revealModifier != settings.revealModifier { toolbarContext.revealModifier = settings.revealModifier }
+    }
+
+    /// Display-local frames that backdrops should cover: the laid-out blocks once
+    /// a translation exists, otherwise the padded original blocks.
+    func backdropFrames() -> [UUID: CGRect] {
+        if !session.blockLayouts.isEmpty {
+            return Dictionary(uniqueKeysWithValues: session.blockLayouts.map { ($0.id, $0.frame) })
+        }
+        var frames: [UUID: CGRect] = [:]
+        for block in session.recognized?.blocks ?? [] {
+            let padding = max(3, block.lineHeight * 0.3)
+            frames[block.id] = block.frame.insetBy(dx: -padding, dy: -padding).intersection(session.region.rect)
+        }
+        return frames
     }
 
     /// Recomputes block positions for the current translation and style.

@@ -57,6 +57,8 @@ final class AppEnvironment {
     let permissions: PermissionMonitor
     let credentials: any CredentialStoring
     let store: SavedTranslationStore?
+    /// True when the on-disk store couldn't open and saved translations last only until quit.
+    var isStoreTemporary = false
 
     var settingsSection: SettingsSection = .general
     /// A language pair Settings should offer to download, set from an overlay error.

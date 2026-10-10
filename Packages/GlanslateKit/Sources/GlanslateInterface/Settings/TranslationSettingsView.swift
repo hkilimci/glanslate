@@ -90,6 +90,8 @@ private struct ProviderPickerLabel: View {
 struct AppleTranslationSection: View {
     @Environment(AppEnvironment.self) private var app
     @State private var source: Language = .french
+    /// Defaults to the preferred target; an overlay's download request may ask for another.
+    @State private var target: Language = .english
     @State private var status: AppleLanguageSupport.Status?
     @State private var configuration: TranslationSession.Configuration?
     @State private var downloadError: String?
@@ -98,9 +100,12 @@ struct AppleTranslationSection: View {
     var body: some View {
         Section {
             Picker("Translate from", selection: $source) {
-                ForEach(Language.sortedCatalog().filter { $0 != app.settings.targetLanguage }) { Text($0.localizedName()).tag($0) }
+                ForEach(Language.sortedCatalog()) { Text($0.localizedName()).tag($0) }
             }
-            LabeledContent("To \(app.settings.targetLanguage.localizedName())") {
+            Picker("Translate to", selection: $target) {
+                ForEach(Language.sortedCatalog()) { Text($0.localizedName()).tag($0) }
+            }
+            LabeledContent("On-device languages") {
                 HStack(spacing: 10) {
                     statusBadge
                     if status == .downloadable {
@@ -120,19 +125,17 @@ struct AppleTranslationSection: View {
         } footer: {
             Text("Apple Translation runs entirely on this Mac. Each language is downloaded once and shared with other apps. Without downloaded languages, Glanslate uses your fallback provider or tells you what to download.")
         }
-        .task(id: StatusKey(source: source, target: app.settings.targetLanguage)) { await refresh() }
+        .task(id: StatusKey(source: source, target: target)) { await refresh() }
         .onAppear {
             if let pending = app.pendingDownload {
-                source = pending.source
-                app.pendingDownload = nil
+                apply(pending)
             } else {
-                source = app.settings.targetLanguage == .english ? .french : .english
+                target = app.settings.targetLanguage
+                source = target == .english ? .french : .english
             }
         }
         .onChange(of: app.pendingDownload) { _, pending in
-            guard let pending else { return }
-            source = pending.source
-            app.pendingDownload = nil
+            if let pending { apply(pending) }
         }
         .translationTask(configuration) { session in
             // The session is used only here, on the main actor, while the view is alive.
@@ -154,19 +157,25 @@ struct AppleTranslationSection: View {
         let target: Language
     }
 
+    private func apply(_ pending: LanguagePair) {
+        source = pending.source
+        target = pending.target
+        app.pendingDownload = nil
+    }
+
     @ViewBuilder
     private var statusBadge: some View {
         switch status {
         case .installed: StatusBadge(text: "Downloaded", tone: .positive)
         case .downloadable: StatusBadge(text: "Not Downloaded", tone: .neutral)
-        case .unsupported: StatusBadge(text: "Not Supported", tone: .attention)
+        case .unsupported: StatusBadge(text: source == target ? "Choose Two Languages" : "Not Supported", tone: .attention)
         case nil: ProgressView().controlSize(.small)
         }
     }
 
     private func refresh() async {
         status = nil
-        status = await AppleLanguageSupport.status(source: source, target: app.settings.targetLanguage)
+        status = await AppleLanguageSupport.status(source: source, target: target)
     }
 
     private func download() {
@@ -174,7 +183,7 @@ struct AppleTranslationSection: View {
         isDownloading = true
         configuration = TranslationSession.Configuration(
             source: AppleLanguageSupport.localeLanguage(for: source),
-            target: AppleLanguageSupport.localeLanguage(for: app.settings.targetLanguage)
+            target: AppleLanguageSupport.localeLanguage(for: target)
         )
     }
 }

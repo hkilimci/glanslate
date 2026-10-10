@@ -68,6 +68,10 @@ struct InterfaceSnapshotTests {
             let mixed = OverlayScene.make(style: .liquidGlass, darkContent: darkContent, settings: mixedEnvironment.settings)
             try render(mixed.view, size: mixed.size, dark: !darkContent, name: "overlay-liquidGlass-\(darkContent ? "darkcontent" : "lightcontent")-mixed", titled: false)
 
+            let rtlEnvironment = try Fixtures.environment()
+            let rtl = OverlayScene.make(style: .liquidGlass, darkContent: darkContent, settings: rtlEnvironment.settings, target: .arabic)
+            try render(rtl.view, size: rtl.size, dark: darkContent, name: "overlay-rtl", titled: false)
+
             let environment = try Fixtures.environment()
             let failing = OverlayScene.make(style: .liquidGlass, darkContent: darkContent, settings: environment.settings, error: .languageModelsNotInstalled(source: .french, target: .english))
             try render(failing.view, size: failing.size, dark: darkContent, name: "overlay-error", titled: false)
@@ -202,18 +206,28 @@ struct OverlayScene {
         Source(text: "Lire la suite", translation: "Read more", frame: CGRect(x: 24, y: 132, width: 92, height: 17), fontSize: 13, weight: .medium),
     ]
 
-    static func make(style: OverlayStyle, darkContent: Bool, settings: AppSettings, error: GlanslateError? = nil) -> OverlayScene {
+    static func make(
+        style: OverlayStyle,
+        darkContent: Bool,
+        settings: AppSettings,
+        error: GlanslateError? = nil,
+        target: Language = .english
+    ) -> OverlayScene {
         let content = sourceContent(dark: darkContent)
 
         let lines = sources.map { RecognizedLine(text: $0.text, frame: $0.frame) }
         let blocks = TextGrouper().group(lines)
         let regionModel = ScreenRegion(displayID: 1, rect: region)
         let recognized = RecognizedText(region: regionModel, blocks: blocks, detectedLanguage: DetectedLanguage(language: .french, confidence: 0.98))
+        let arabic = target == .arabic
         let translations = blocks.map { block -> String in
             switch block.text {
-            case let text where text.hasPrefix("Un nouveau"): return "A new look at the city"
-            case let text where text.hasPrefix("Les cafés"): return "The neighborhood cafés open early and close late, and the streets stay lively until midnight."
-            default: return "Read more"
+            case let text where text.hasPrefix("Un nouveau"): return arabic ? "نظرة جديدة على المدينة" : "A new look at the city"
+            case let text where text.hasPrefix("Les cafés"):
+                return arabic
+                    ? "تفتح مقاهي الحي مبكرًا وتغلق متأخرًا، وتبقى الشوارع مفعمة بالحياة حتى منتصف الليل."
+                    : "The neighborhood cafés open early and close late, and the streets stay lively until midnight."
+            default: return arabic ? "اقرأ المزيد" : "Read more"
             }
         }
 
@@ -223,7 +237,7 @@ struct OverlayScene {
             display: display,
             layout: DisplayLayout(displays: [display]),
             sourceLanguage: .automatic,
-            targetLanguage: .english,
+            targetLanguage: target,
             style: style
         )
         session.recognized = recognized
@@ -233,7 +247,7 @@ struct OverlayScene {
         } else {
             session.result = GlanceResult(
                 recognized: recognized,
-                outcome: TranslationOutcome(provider: .apple, texts: translations, source: .french, target: .english, fallback: nil)
+                outcome: TranslationOutcome(provider: .apple, texts: translations, source: .french, target: target, fallback: nil)
             )
             session.phase = .ready
             session.blockLayouts = OverlayLayoutEngine().layout(

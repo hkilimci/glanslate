@@ -13,11 +13,13 @@ public struct VisionTextRecognizer: Sendable {
         var request = RecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
-        if languages.isEmpty {
+        // Vision reads a subset of languages; hint only the ones it supports.
+        let hints = Self.supportedHints(for: languages, supported: request.supportedRecognitionLanguages)
+        if hints.isEmpty {
             request.automaticallyDetectsLanguage = true
         } else {
             request.automaticallyDetectsLanguage = false
-            request.recognitionLanguages = languages.map { Locale.Language(identifier: $0.code) }
+            request.recognitionLanguages = hints
         }
 
         let observations: [RecognizedTextObservation]
@@ -25,6 +27,17 @@ public struct VisionTextRecognizer: Sendable {
             observations = try await request.perform(on: image, orientation: nil)
         } catch is CancellationError {
             throw CancellationError()
+        } catch where !hints.isEmpty {
+            // Retry without hints rather than failing the capture.
+            var automatic = RecognizeTextRequest()
+            automatic.recognitionLevel = .accurate
+            automatic.usesLanguageCorrection = true
+            automatic.automaticallyDetectsLanguage = true
+            do {
+                observations = try await automatic.perform(on: image, orientation: nil)
+            } catch {
+                throw GlanslateError.recognitionFailed(detail: String(describing: type(of: error)))
+            }
         } catch {
             throw GlanslateError.recognitionFailed(detail: String(describing: type(of: error)))
         }
@@ -40,6 +53,17 @@ public struct VisionTextRecognizer: Sendable {
                 confidence: Double(candidate.confidence),
                 source: .ocr
             )
+        }
+    }
+
+    /// The requested languages that Vision can recognize, matched by language and script.
+    static func supportedHints(for languages: [Language], supported: [Locale.Language]) -> [Locale.Language] {
+        languages.compactMap { language in
+            let wanted = Locale.Language(identifier: language.code)
+            return supported.first { candidate in
+                candidate.languageCode == wanted.languageCode
+                    && (wanted.script == nil || candidate.script == nil || candidate.script == wanted.script)
+            }
         }
     }
 }

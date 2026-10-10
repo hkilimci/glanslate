@@ -35,6 +35,8 @@ final class GlanceController {
 
     private var workflow: Task<Void, Never>?
     private var backdropTask: Task<Void, Never>?
+    /// The app that was in front before Glanslate took focus for a selection.
+    private var previousApplication: NSRunningApplication?
     private var current: GlanceOverlayController?
     private var screenObserver: (any NSObjectProtocol)?
 
@@ -66,7 +68,10 @@ final class GlanceController {
             navigation.showPermissions()
             return
         }
-        dismiss()
+        if let frontmost = NSWorkspace.shared.frontmostApplication, frontmost != .current {
+            previousApplication = frontmost
+        }
+        dismiss(restoringFocus: false)
         toasts.dismiss()
         workflow?.cancel()
         workflow = Task { [weak self] in
@@ -75,7 +80,10 @@ final class GlanceController {
     }
 
     private func run() async {
-        guard let target = await selection.select(), !Task.isCancelled else { return }
+        guard let target = await selection.select(), !Task.isCancelled else {
+            restoreFocus()
+            return
+        }
 
         let layout = DisplayLayout.current
         guard let display = layout.display(withID: target.region.displayID) else {
@@ -132,6 +140,7 @@ final class GlanceController {
     /// Translates (or retranslates) the session's recognized text with its current choices.
     func translate(_ session: GlanceSession) {
         guard let recognized = session.recognized else { return }
+        current?.setConfiguredProviders(configuredProviders(), canPin: store != nil)
         session.error = nil
         if session.result == nil {
             session.phase = .translating
@@ -160,6 +169,7 @@ final class GlanceController {
                 session.error = nil
                 session.phase = .ready
                 self.current?.relayout()
+                self.renderBackdrops(for: session)
                 if session.isPinned { self.savePinned(session) }
                 Self.log.info("Translated with \(outcome.provider.rawValue, privacy: .public)")
             case .failure(let error):
@@ -186,12 +196,9 @@ final class GlanceController {
     }
 
     private func renderBackdrops(for session: GlanceSession) {
-        guard let capture = session.capture, let recognized = session.recognized else { return }
-        var frames: [UUID: CGRect] = [:]
-        for block in recognized.blocks {
-            let padding = max(3, block.lineHeight * 0.3)
-            frames[block.id] = block.frame.insetBy(dx: -padding, dy: -padding).intersection(session.region.rect)
-        }
+        guard let capture = session.capture, let overlay = current, overlay.session === session else { return }
+        // Crop exactly the frames the blocks are drawn in, so blurred backdrops aren't stretched.
+        let frames = overlay.backdropFrames().mapValues { $0.intersection(session.region.rect) }.filter { !$0.value.isNull }
         backdropTask?.cancel()
         backdropTask = Task { [weak session] in
             let backdrops = await BackdropRenderer.render(capture: capture, frames: frames)
@@ -268,6 +275,7 @@ final class GlanceController {
                 session.isPinned = false
             } catch {
                 Self.log.error("Couldn’t remove saved translation")
+                session.error = .saveFailed
             }
         } else {
             savePinned(session)
@@ -282,6 +290,7 @@ final class GlanceController {
             session.isPinned = true
         } catch {
             Self.log.error("Couldn’t save translation")
+            session.error = .saveFailed
         }
     }
 
@@ -293,16 +302,30 @@ final class GlanceController {
 
     /// Hides the current overlay and cancels any work for it.
     func dismiss() {
+        dismiss(restoringFocus: true)
+    }
+
+    private func dismiss(restoringFocus: Bool) {
+        let hadOverlay = current != nil
         translationRunner.cancel()
         backdropTask?.cancel()
         workflow?.cancel()
         current?.close()
         current = nil
+        if restoringFocus, hadOverlay { restoreFocus() }
+    }
+
+    /// Hands keyboard focus back to the app the user was in, unless one of
+    /// Glanslate's own windows (Settings, Saved Translations) is in front.
+    private func restoreFocus() {
+        guard NSApp.isActive, let app = previousApplication, !app.isTerminated else { return }
+        if let key = NSApp.keyWindow, !(key is NSPanel), key.isVisible { return }
+        app.activate()
     }
 
     func cancelAll() {
         selection.cancel()
-        dismiss()
+        dismiss(restoringFocus: false)
         toasts.dismiss()
     }
 

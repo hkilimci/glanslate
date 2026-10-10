@@ -59,11 +59,14 @@ final class SelectionController {
             panels.first?.selectionView.showsHints = true
         }
 
-        NSApp.activate()
         for panel in panels {
             panel.orderFrontRegardless()
         }
-        (panels.first { $0.selectionView.showsHints } ?? panels.first)?.makeKey()
+        NSApp.activate()
+        if let main = panels.first(where: { $0.selectionView.showsHints }) ?? panels.first {
+            main.makeKey()
+            main.makeFirstResponder(main.selectionView)
+        }
 
         // Escape must cancel even if another app keeps keyboard focus.
         escapeToken = try? HotKeyCenter.shared.register(KeyCombo(keyCode: 0x35, modifiers: [], key: "⎋")) { [weak self] in
@@ -128,6 +131,7 @@ final class SelectionPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         animationBehavior = .none
         contentView = view
+        initialFirstResponder = view
     }
 
     override var canBecomeKey: Bool { true }
@@ -142,7 +146,7 @@ final class SelectionView: NSView {
     private var anchor: CGPoint?
     private var selection: CGRect?
     private var hoveredWindow: (id: UInt32, rect: CGRect)?
-    private var hintHost: NSHostingView<SelectionHintView>?
+    private var hintHost: PassthroughHostingView<SelectionHintView>?
     private var hintModel = SelectionHintModel()
     private var messageTask: Task<Void, Never>?
 
@@ -154,7 +158,7 @@ final class SelectionView: NSView {
         self.display = display
         self.controller = controller
         super.init(frame: CGRect(origin: .zero, size: display.frame.size))
-        let host = NSHostingView(rootView: SelectionHintView(model: hintModel))
+        let host = PassthroughHostingView(rootView: SelectionHintView(model: hintModel))
         // The hints sit on dimmed content, so they always use the dark appearance.
         host.appearance = NSAppearance(named: .darkAqua)
         host.translatesAutoresizingMaskIntoConstraints = false
@@ -197,7 +201,15 @@ final class SelectionView: NSView {
 
     override func mouseEntered(with event: NSEvent) {
         window?.makeKey()
+        window?.makeFirstResponder(self)
         cursorUpdate(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        if hoveredWindow != nil {
+            hoveredWindow = nil
+            needsDisplay = true
+        }
     }
 
     func modeDidChange() {
@@ -220,7 +232,7 @@ final class SelectionView: NSView {
     }
 
     private func updateHover(at point: CGPoint) {
-        let hovered = controller?.window(at: point, on: display)
+        let hovered = bounds.contains(point) ? controller?.window(at: point, on: display) : nil
         if hovered?.id != hoveredWindow?.id || hovered?.rect != hoveredWindow?.rect {
             hoveredWindow = hovered
             needsDisplay = true
@@ -363,6 +375,11 @@ final class SelectionView: NSView {
         NSBezierPath(roundedRect: badgeRect, xRadius: badge.height / 2, yRadius: badge.height / 2).fill()
         text.draw(at: CGPoint(x: badgeRect.minX + 6, y: badgeRect.minY + 3), withAttributes: attributes)
     }
+}
+
+/// Hosts hint content without intercepting the mouse, so drags can start anywhere.
+final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 @MainActor

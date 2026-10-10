@@ -23,7 +23,6 @@ final class WindowRouter: NSObject, NSWindowDelegate {
         windows[kind] = window
         updateActivationPolicy(windowOpening: true)
         NSApp.activate()
-        if !window.isVisible { window.center() }
         window.makeKeyAndOrderFront(nil)
     }
 
@@ -105,6 +104,9 @@ final class WindowRouter: NSObject, NSWindowDelegate {
         window.collectionBehavior.insert(.fullScreenNone)
         if let autosave {
             window.setFrameAutosaveName(autosave)
+            if !window.setFrameUsingName(autosave) { window.center() }
+        } else {
+            window.center()
         }
         return window
     }

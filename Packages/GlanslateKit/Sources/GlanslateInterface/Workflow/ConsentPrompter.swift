@@ -21,7 +21,7 @@ struct ConsentPrompter: ConsentGate {
         alert.messageText = "Translate with \(provider.displayName)?"
         alert.informativeText = Self.disclosure(for: provider)
         alert.addButton(withTitle: "Allow")
-        alert.addButton(withTitle: "Don’t Allow")
+        alert.addButton(withTitle: "Don’t Allow").keyEquivalent = "\u{1b}"
         alert.showsHelp = provider.privacyPolicyURL != nil
         let helpDelegate = PrivacyHelpDelegate(url: provider.privacyPolicyURL)
         alert.delegate = helpDelegate
