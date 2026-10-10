@@ -42,4 +42,7 @@ public protocol CredentialProviding: Sendable {
 /// Asks the user, once per cloud provider, whether recognized text may be sent to it.
 public protocol ConsentGate: Sendable {
     func requestConsent(for provider: TranslationProvider) async -> Bool
+    /// Whether consent is on record right now, without asking. Checked before every
+    /// cloud request, so permission revoked during a translation stops later sends.
+    func hasConsent(for provider: TranslationProvider) async -> Bool
 }

@@ -11,6 +11,10 @@ struct ConsentPrompter: ConsentGate {
         await Self.ask(provider, settings: settings)
     }
 
+    func hasConsent(for provider: TranslationProvider) async -> Bool {
+        await MainActor.run { settings.hasConsent(for: provider) }
+    }
+
     @MainActor
     static func ask(_ provider: TranslationProvider, settings: AppSettings) async -> Bool {
         if settings.hasConsent(for: provider) { return true }

@@ -97,14 +97,21 @@ public struct OverlayLayoutEngine: Sendable {
             .filter { $0.verticalOverlapRatio(with: frame) > 0.3 && $0.minX >= input.sourceFrame.maxX - 1 }
             .map { $0.minX - neighborGap }
             .min() ?? bounds.maxX
-        let bottomLimit = others
-            .filter { $0.horizontalOverlapRatio(with: frame) > 0 && $0.minY >= input.sourceFrame.maxY - 1 }
-            .map { $0.minY - neighborGap }
-            .min() ?? bounds.maxY
 
         let isLabel = input.lineCount <= 1
         let widerWidth = max(frame.width, min(rightLimit - frame.minX, frame.width * (isLabel ? 1.8 : 1.12)))
         let widths = widerWidth > frame.width + 1 ? [frame.width, widerWidth] : [frame.width]
+
+        /// The tallest a frame of `width` can grow before it covers a block below it.
+        /// Measured per width, since a widened frame can sit above blocks the original doesn't.
+        func maxHeight(_ width: CGFloat) -> CGFloat {
+            let span = CGRect(x: frame.minX, y: frame.minY, width: width, height: frame.height)
+            let bottomLimit = others
+                .filter { $0.horizontalOverlapRatio(with: span) > 0 && $0.minY >= input.sourceFrame.maxY - 1 }
+                .map { $0.minY - neighborGap }
+                .min() ?? bounds.maxY
+            return max(frame.height, bottomLimit - frame.minY)
+        }
 
         func neededHeight(_ size: CGFloat, _ width: CGFloat) -> CGFloat {
             measurer.size(of: input.text, fontSize: size, width: max(1, width - 2 * padding.width)).height + 2 * padding.height
@@ -130,21 +137,38 @@ public struct OverlayLayoutEngine: Sendable {
             )
         }
 
-        // 2. Borrow space below, down to the next block or the region edge.
-        let width = widths.last ?? frame.width
-        let maxHeight = max(frame.height, bottomLimit - frame.minY)
-        if let size = largestFitting(sizes(from: base, to: minimumFontSize), fits: { neededHeight($0, width) <= maxHeight }) {
+        // 2. Borrow space below, down to the next block or the region edge. The widest
+        //    frame is preferred unless a narrower one allows a larger size.
+        let allSizes = sizes(from: base, to: minimumFontSize)
+        var borrowed: (size: CGFloat, width: CGFloat)?
+        for width in widths.reversed() {
+            let limit = maxHeight(width)
+            if let size = largestFitting(allSizes, fits: { neededHeight($0, width) <= limit }),
+               size > (borrowed?.size ?? 0) {
+                borrowed = (size, width)
+            }
+        }
+        if let borrowed {
             return OverlayBlockLayout(
                 id: input.id,
-                frame: CGRect(x: frame.minX, y: frame.minY, width: width, height: max(neededHeight(size, width), frame.height)),
-                fontSize: size,
+                frame: CGRect(
+                    x: frame.minX,
+                    y: frame.minY,
+                    width: borrowed.width,
+                    height: max(neededHeight(borrowed.size, borrowed.width), frame.height)
+                ),
+                fontSize: borrowed.size,
                 padding: padding,
                 isCompressed: false
             )
         }
 
-        // 3. Smallest readable size, using every point available.
-        let fallbackHeight = min(neededHeight(minimumFontSize, width), max(maxHeight, bounds.maxY - frame.minY))
+        // 3. Smallest readable size in whichever width leaves the least text over. The
+        //    frame still stops at the next block; text that doesn't fit is truncated
+        //    rather than drawn over another translation.
+        func overflow(_ width: CGFloat) -> CGFloat { neededHeight(minimumFontSize, width) - maxHeight(width) }
+        let width = widths.min { overflow($0) < overflow($1) } ?? frame.width
+        let fallbackHeight = min(neededHeight(minimumFontSize, width), maxHeight(width))
         return OverlayBlockLayout(
             id: input.id,
             frame: CGRect(x: frame.minX, y: frame.minY, width: width, height: max(fallbackHeight, frame.height)),

@@ -191,7 +191,8 @@ final class GlanceController {
                 GoogleTranslateEngine(credentials: credentials, transport: transport),
                 OpenAIEngine(credentials: credentials, transport: transport, model: settings.openAIModel),
             ],
-            consent: ConsentPrompter(settings: settings)
+            consent: ConsentPrompter(settings: settings),
+            detector: NaturalLanguageDetector()
         )
     }
 

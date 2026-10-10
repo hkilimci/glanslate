@@ -47,6 +47,25 @@ struct OverlayLayoutTests {
         #expect(layout.fontSize >= engine.minimumFontSize)
     }
 
+    @Test func compressedBlocksStopAtTheNextBlock() {
+        let label = input(String(repeating: "longer words ", count: 10), frame: CGRect(x: 10, y: 10, width: 120, height: 20))
+        let below = input("Next", frame: CGRect(x: 10, y: 34, width: 200, height: 20))
+        let layout = engine.layout([label, below], in: bounds, measurer: measurer)[0]
+        #expect(layout.isCompressed)
+        #expect(layout.frame.maxY <= below.sourceFrame.minY, "Truncated rather than drawn over the next block")
+    }
+
+    @Test func widenedBlocksDoNotGrowOverBlocksBelowTheWiderPart() {
+        let label = input(
+            "A considerably longer translation that wraps onto more lines",
+            frame: CGRect(x: 10, y: 10, width: 120, height: 20)
+        )
+        // Below and to the right: clear of the original width, but under a widened frame.
+        let neighbor = input("Side", frame: CGRect(x: 160, y: 40, width: 100, height: 20))
+        let layout = engine.layout([label, neighbor], in: bounds, measurer: measurer)[0]
+        #expect(!layout.frame.intersects(neighbor.sourceFrame))
+    }
+
     @Test func impossibleFitsUseTheMinimumSizeAndAreFlagged() {
         let tiny = input(String(repeating: "word ", count: 400), frame: CGRect(x: 10, y: 10, width: 60, height: 14))
         let layout = engine.layout([tiny], in: CGRect(x: 0, y: 0, width: 100, height: 40), measurer: measurer)[0]

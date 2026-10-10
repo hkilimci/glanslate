@@ -83,10 +83,16 @@ public struct ScreenCaptureService: ScreenCapturing {
         }
 
         let filter: SCContentFilter
-        if let windowID = target.windowID, let window = content.windows.first(where: { $0.windowID == windowID }) {
-            // Only the chosen window, so overlapping windows don't leak into the capture.
+        switch target {
+        case .window(let windowID, _):
+            // Only the chosen window, so overlapping windows don't leak into the capture. If it
+            // closed or was minimized after it was picked, fail instead of capturing whatever
+            // now occupies its place.
+            guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
+                throw GlanslateError.captureFailed(detail: "Window unavailable")
+            }
             filter = SCContentFilter(display: display, including: [window])
-        } else {
+        case .area:
             let ownPID = ProcessInfo.processInfo.processIdentifier
             let ownApps = content.applications.filter { $0.processID == ownPID }
             filter = SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])

@@ -8,9 +8,12 @@ private final class ScriptedEngine: TranslationEngine, @unchecked Sendable {
     var readinessValue: EngineReadiness
     var failure: (any Error)?
     var delay: Duration?
+    /// Runs while the request is in flight, before it completes or fails.
+    var onTranslate: (@Sendable () async -> Void)?
     private let lock = NSLock()
     private var _calls = 0
     private var _sources: [Language?] = []
+    private var _texts: [[String]] = []
 
     init(_ provider: TranslationProvider, readiness: EngineReadiness = .ready, failure: (any Error)? = nil, delay: Duration? = nil) {
         self.provider = provider
@@ -21,6 +24,7 @@ private final class ScriptedEngine: TranslationEngine, @unchecked Sendable {
 
     var calls: Int { lock.withLock { _calls } }
     var sources: [Language?] { lock.withLock { _sources } }
+    var texts: [[String]] { lock.withLock { _texts } }
 
     func readiness(source: Language?, target: Language) async -> EngineReadiness {
         if provider == .apple, source == nil, readinessValue == .ready { return .needsSourceLanguage }
@@ -31,7 +35,9 @@ private final class ScriptedEngine: TranslationEngine, @unchecked Sendable {
         lock.withLock {
             _calls += 1
             _sources.append(source)
+            _texts.append(texts)
         }
+        await onTranslate?()
         if let delay { try await Task.sleep(for: delay) }
         if let failure { throw failure }
         return EngineResult(texts: texts.map { "[\(provider.rawValue)] \($0)" })
@@ -40,12 +46,26 @@ private final class ScriptedEngine: TranslationEngine, @unchecked Sendable {
 
 private actor RecordingConsent: ConsentGate {
     var asked: [TranslationProvider] = []
+    /// Providers switched off since the routing policy was captured.
+    var revoked: Set<TranslationProvider> = []
     let answer: Bool
     init(answer: Bool) { self.answer = answer }
     func requestConsent(for provider: TranslationProvider) async -> Bool {
         asked.append(provider)
         return answer
     }
+    func hasConsent(for provider: TranslationProvider) async -> Bool {
+        !revoked.contains(provider)
+    }
+    func revoke(_ provider: TranslationProvider) {
+        revoked.insert(provider)
+    }
+}
+
+/// Reports scripted languages for exact texts, and nothing for anything else.
+private struct ScriptedDetector: LanguageDetecting {
+    let languages: [String: DetectedLanguage]
+    func detectLanguage(of text: String) -> DetectedLanguage? { languages[text] }
 }
 
 private func request(
@@ -174,6 +194,77 @@ struct ProviderRoutingTests {
         await #expect(throws: GlanslateError.alreadyInTargetLanguage(.english)) {
             try await router.translate(request(detected: DetectedLanguage(language: .english, confidence: 0.95)), policy: RoutingPolicy())
         }
+    }
+
+    @Test func mixedCapturesTranslateOnlyTheForeignParagraphs() async throws {
+        let menu = "Settings and preferences"
+        let article = "Ein ganzer Absatz auf Deutsch"
+        let detector = ScriptedDetector(languages: [
+            menu: DetectedLanguage(language: .english, confidence: 0.9),
+            article: DetectedLanguage(language: .german, confidence: 0.95),
+        ])
+        let apple = ScriptedEngine(.apple)
+        let router = TranslationRouter(engines: [apple], consent: RecordingConsent(answer: true), detector: detector)
+        // The capture reads as English overall; "Home" is too short to identify on its own.
+        let mixed = TranslationRequest(
+            texts: ["Home", menu, article],
+            source: .automatic,
+            detected: DetectedLanguage(language: .english, confidence: 0.95),
+            target: .english,
+            choice: .automatic
+        )
+        let outcome = try await router.translate(mixed, policy: RoutingPolicy(preferred: .apple))
+        #expect(apple.texts == [[article]], "Paragraphs already in English aren't sent")
+        #expect(apple.sources == [.german])
+        #expect(outcome.texts == ["Home", menu, "[apple] \(article)"])
+        #expect(outcome.source == .german)
+    }
+
+    @Test func capturesEntirelyInTheTargetLanguageAreStillReported() async {
+        let detector = ScriptedDetector(languages: ["Settings and preferences": DetectedLanguage(language: .english, confidence: 0.9)])
+        let apple = ScriptedEngine(.apple)
+        let router = TranslationRouter(engines: [apple], consent: RecordingConsent(answer: true), detector: detector)
+        let english = TranslationRequest(
+            texts: ["Home", "Settings and preferences", "12:30"],
+            source: .automatic,
+            detected: DetectedLanguage(language: .english, confidence: 0.95),
+            target: .english,
+            choice: .automatic
+        )
+        await #expect(throws: GlanslateError.alreadyInTargetLanguage(.english)) {
+            try await router.translate(english, policy: RoutingPolicy(preferred: .apple))
+        }
+        #expect(apple.calls == 0)
+    }
+
+    @Test func aChosenSourceEqualToTheTargetIsReportedEvenWhenMixed() async {
+        let detector = ScriptedDetector(languages: ["Ein ganzer Absatz auf Deutsch": DetectedLanguage(language: .german, confidence: 0.95)])
+        let router = TranslationRouter(engines: [ScriptedEngine(.apple)], consent: RecordingConsent(answer: true), detector: detector)
+        let chosen = TranslationRequest(
+            texts: ["Ein ganzer Absatz auf Deutsch"],
+            source: .specific(.english),
+            detected: nil,
+            target: .english,
+            choice: .automatic
+        )
+        await #expect(throws: GlanslateError.alreadyInTargetLanguage(.english)) {
+            try await router.translate(chosen, policy: RoutingPolicy(preferred: .apple))
+        }
+    }
+
+    @Test func consentRevokedDuringATranslationBlocksTheFallback() async {
+        let consent = RecordingConsent(answer: true)
+        let deepL = ScriptedEngine(.deepL, failure: GlanslateError.network(.deepL, .timedOut))
+        // The user switches Google off in Settings while DeepL is still timing out.
+        deepL.onTranslate = { await consent.revoke(.google) }
+        let google = ScriptedEngine(.google)
+        let router = TranslationRouter(engines: [deepL, google], consent: consent)
+        let policy = RoutingPolicy(preferred: .deepL, fallback: .google, consented: [.deepL, .google])
+        await #expect(throws: GlanslateError.network(.deepL, .timedOut)) {
+            try await router.translate(request(), policy: policy)
+        }
+        #expect(google.calls == 0, "Revoked providers never receive text")
+        #expect(await consent.asked.isEmpty, "Consent recorded at the start isn't asked for again")
     }
 
     @Test func cancellationStopsRoutingWithoutFallback() async {
