@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-linux:
+    name: Core tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test GlanslateCore
+        run: swift test --package-path Packages/GlanslateKit
+
+  macos:
+    name: Build and test (macOS 26)
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Test package
+        run: swift test --package-path Packages/GlanslateKit 2>&1 | tee package-test.log
+      - name: Build app
+        if: hashFiles('Glanslate.xcodeproj/project.pbxproj') != ''
+        run: |
+          set -o pipefail
+          xcodebuild -project Glanslate.xcodeproj -scheme Glanslate -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath build \
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build 2>&1 | tee app-build.log | xcbeautify
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: "*.log"
