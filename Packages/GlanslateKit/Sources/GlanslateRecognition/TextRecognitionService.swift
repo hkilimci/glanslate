@@ -37,8 +37,6 @@ public struct TextRecognitionService: Sendable {
         quartzRect: CGRect?,
         sourceHint: Language?
     ) async throws -> RecognizedText {
-        // `CGImage` is immutable; hand it to the OCR task explicitly.
-        nonisolated(unsafe) let image = image
         async let ocrLines = vision.recognizeLines(in: image, geometry: geometry, languages: sourceHint.map { [$0] } ?? [])
         async let axFragments = accessibilityFragments(in: quartzRect)
 

@@ -43,6 +43,18 @@ jobs:
           fi
       - name: Test package
         run: swift test --skip-build --package-path Packages/GlanslateKit 2>&1 | tail -60
+      - name: Render interface snapshots
+        run: |
+          mkdir -p snapshots
+          GLANSLATE_SNAPSHOTS="$PWD/snapshots" swift test --skip-build --package-path Packages/GlanslateKit \
+            --filter InterfaceSnapshotTests 2>&1 | tail -20
+          ls snapshots | head -80
+      - name: Upload snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: interface-snapshots
+          path: snapshots
+          retention-days: 14
       - name: Build app
         if: hashFiles('Glanslate.xcodeproj/project.pbxproj') != ''
         run: |

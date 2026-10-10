@@ -11,7 +11,11 @@ struct OnboardingView: View {
 
     @Environment(AppEnvironment.self) private var app
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var step: Step = .welcome
+    @State private var step: Step
+
+    init(initialStep: Step = .welcome) {
+        _step = State(initialValue: initialStep)
+    }
 
     var body: some View {
         VStack(spacing: 0) {

@@ -15,8 +15,8 @@ struct BlockBackdrop: @unchecked Sendable {
 }
 
 enum BackdropRenderer {
-    /// `CIContext` is thread-safe; one shared context avoids repeated setup.
-    nonisolated(unsafe) private static let context = CIContext(options: [.cacheIntermediates: false])
+    /// One shared context avoids repeated setup; `CIContext` is thread-safe.
+    private static let context = CIContext(options: [.cacheIntermediates: false])
 
     /// Renders backdrops for display-local block frames, off the main thread.
     static func render(capture: CapturedImage, frames: [UUID: CGRect]) async -> [UUID: BlockBackdrop] {
