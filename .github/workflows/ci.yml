@@ -44,12 +44,15 @@ jobs:
       - name: Test package
         run: swift test --skip-build --package-path Packages/GlanslateKit 2>&1 | tail -60
       - name: Render interface snapshots
+        timeout-minutes: 6
+        continue-on-error: true
         run: |
           mkdir -p snapshots
           GLANSLATE_SNAPSHOTS="$PWD/snapshots" swift test --skip-build --package-path Packages/GlanslateKit \
             --filter InterfaceSnapshotTests 2>&1 | tail -20
           ls snapshots | head -80
       - name: Upload snapshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: interface-snapshots

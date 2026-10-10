@@ -24,7 +24,7 @@ final class GlanceController {
 
     private let settings: AppSettings
     private let store: SavedTranslationStore?
-    private let credentials: KeychainCredentialStore
+    private let credentials: any CredentialStoring
     private let navigation: Navigation
     private let selection = SelectionController()
     private let capturer: any ScreenCapturing = ScreenCaptureService()
@@ -38,7 +38,7 @@ final class GlanceController {
     private var current: GlanceOverlayController?
     private var screenObserver: (any NSObjectProtocol)?
 
-    init(settings: AppSettings, store: SavedTranslationStore?, credentials: KeychainCredentialStore, navigation: Navigation) {
+    init(settings: AppSettings, store: SavedTranslationStore?, credentials: any CredentialStoring, navigation: Navigation) {
         self.settings = settings
         self.store = store
         self.credentials = credentials

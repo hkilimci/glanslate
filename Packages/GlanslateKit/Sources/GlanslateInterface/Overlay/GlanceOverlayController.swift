@@ -6,6 +6,9 @@ import SwiftUI
 /// A borderless floating panel for overlay content. Transparent areas let
 /// clicks through to the app underneath.
 final class OverlayPanel: NSPanel {
+    /// Called when the user presses Escape while this panel has keyboard focus.
+    var onCancel: (@MainActor () -> Void)?
+
     init(frame: CGRect) {
         super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         level = .floating
@@ -21,6 +24,10 @@ final class OverlayPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func cancelOperation(_ sender: Any?) {
+        if let onCancel { onCancel() } else { super.cancelOperation(sender) }
+    }
 }
 
 /// A hosting view that reports when its SwiftUI content changes size.
@@ -67,6 +74,8 @@ final class GlanceOverlayController {
         toolbar.sizingOptions = [.intrinsicContentSize]
         toolbarPanel.contentView = toolbar
         toolbar.onSizeChange = { [weak self] size in self?.placeToolbar(size: size) }
+        canvasPanel.onCancel = actions.dismiss
+        toolbarPanel.onCancel = actions.dismiss
         placeToolbar(size: toolbar.fittingSize)
     }
 

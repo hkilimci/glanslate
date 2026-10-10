@@ -2,9 +2,16 @@ import Foundation
 import GlanslateCore
 import Security
 
+/// Reads and writes provider API keys.
+public protocol CredentialStoring: CredentialProviding {
+    func hasCredential(for provider: TranslationProvider) -> Bool
+    func setCredential(_ value: String, for provider: TranslationProvider) throws
+    func removeCredential(for provider: TranslationProvider) throws
+}
+
 /// Stores provider API keys as generic passwords in the user's login Keychain.
 /// Keys are never written to preferences or logs.
-public struct KeychainCredentialStore: CredentialProviding {
+public struct KeychainCredentialStore: CredentialStoring {
     public let service: String
 
     public init(service: String = "app.glanslate.credentials") {

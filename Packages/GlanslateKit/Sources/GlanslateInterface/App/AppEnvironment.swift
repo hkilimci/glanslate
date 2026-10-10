@@ -55,7 +55,7 @@ struct LanguagePair: Hashable, Sendable {
 final class AppEnvironment {
     let settings: AppSettings
     let permissions: PermissionMonitor
-    let credentials: KeychainCredentialStore
+    let credentials: any CredentialStoring
     let store: SavedTranslationStore?
 
     var settingsSection: SettingsSection = .general
@@ -80,7 +80,7 @@ final class AppEnvironment {
         var showAbout: @MainActor () -> Void = {}
     }
 
-    init(settings: AppSettings, permissions: PermissionMonitor, credentials: KeychainCredentialStore, store: SavedTranslationStore?) {
+    init(settings: AppSettings, permissions: PermissionMonitor, credentials: any CredentialStoring, store: SavedTranslationStore?) {
         self.settings = settings
         self.permissions = permissions
         self.credentials = credentials

@@ -160,7 +160,11 @@ On macOS this runs every suite. On Linux it runs the GlanslateCore suites. In Xc
 - **Persistence.** Save, update, search, delete, and clear all.
 - **Settings.** Persistence and hot key modifiers.
 
-CI (`.github/workflows/ci.yml`) runs the core tests on Linux and the full package tests, app build, and scheme tests on a macOS 26 runner.
+CI (`.github/workflows/ci.yml`) runs the core tests on Linux and, on a macOS 26 runner, the full package tests, the app build, and the scheme tests. It also renders every Settings section, each onboarding step, Saved Translations, the three overlay styles, and the selection hints in light and dark appearance, and uploads them as the `interface-snapshots` artifact for visual review. To render them locally:
+
+```sh
+GLANSLATE_SNAPSHOTS=/tmp/glanslate-snapshots swift test --package-path Packages/GlanslateKit --filter InterfaceSnapshotTests
+```
 
 **Manual checks.** The interface itself, capture, and permissions need a real session. Before a release, check:
 
@@ -177,6 +181,14 @@ CI (`.github/workflows/ci.yml`) runs the core tests on Linux and the full packag
 - **Google says the service needs setup.** Enable the Cloud Translation API and billing for the project the key belongs to.
 - **Keychain prompts with locally signed builds.** Keychain access, like privacy permissions, is tied to the signature. Signing with your team avoids repeated prompts.
 
+## Releasing
+
+`scripts/release.sh` archives a Release build signed with Developer ID, notarizes it when `NOTARY_PROFILE` names a `notarytool` keychain profile, and packages a disk image:
+
+```sh
+GLANSLATE_DEVELOPMENT_TEAM=ABCDE12345 NOTARY_PROFILE=glanslate scripts/release.sh
+```
+
 ## Project layout
 
 ```
@@ -184,6 +196,6 @@ Glanslate.xcodeproj         Xcode project (app target + local package)
 Glanslate/                  App target sources and asset catalog
 Configs/                    Info.plist, entitlements, xcconfig
 Packages/GlanslateKit/      Swift package with all modules and tests
-scripts/                    Release helpers (archive, notarize, DMG)
+scripts/                    Release (archive, notarize, DMG) and app icon generation
 .github/workflows/ci.yml    Continuous integration
 ```

@@ -10,7 +10,7 @@ import Testing
 /// Renders the real windows and overlay in light and dark appearance to PNG
 /// files for visual review. Runs only when `GLANSLATE_SNAPSHOTS` names an
 /// output directory (CI uploads the result as an artifact).
-@Suite("Interface snapshots", .enabled(if: ProcessInfo.processInfo.environment["GLANSLATE_SNAPSHOTS"] != nil))
+@Suite("Interface snapshots", .serialized, .enabled(if: ProcessInfo.processInfo.environment["GLANSLATE_SNAPSHOTS"] != nil))
 @MainActor
 struct InterfaceSnapshotTests {
     let output = URL(fileURLWithPath: ProcessInfo.processInfo.environment["GLANSLATE_SNAPSHOTS"] ?? NSTemporaryDirectory())
@@ -119,7 +119,19 @@ struct InterfaceSnapshotTests {
         try data.write(to: output.appendingPathComponent("\(name)-\(dark ? "dark" : "light").png"))
         window.orderOut(nil)
         window.close()
+        print("Rendered \(name)-\(dark ? "dark" : "light")")
     }
+}
+
+/// Keeps snapshot rendering away from the real Keychain.
+final class InMemoryCredentialStore: CredentialStoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [TranslationProvider: String] = [:]
+
+    func credential(for provider: TranslationProvider) -> String? { lock.withLock { values[provider] } }
+    func hasCredential(for provider: TranslationProvider) -> Bool { credential(for: provider) != nil }
+    func setCredential(_ value: String, for provider: TranslationProvider) throws { lock.withLock { values[provider] = value } }
+    func removeCredential(for provider: TranslationProvider) throws { _ = lock.withLock { values.removeValue(forKey: provider) } }
 }
 
 // MARK: - Fixtures
@@ -133,7 +145,7 @@ enum Fixtures {
         return AppEnvironment(
             settings: settings,
             permissions: PermissionMonitor(),
-            credentials: KeychainCredentialStore(service: "app.glanslate.snapshots.\(UUID().uuidString)"),
+            credentials: InMemoryCredentialStore(),
             store: try SavedTranslationStore(inMemory: true)
         )
     }
