@@ -21,7 +21,7 @@ public struct TextAssembler: Sendable {
         ocrLines: [RecognizedLine],
         accessibilityFragments: [AccessibleTextFragment]
     ) -> RecognizedText {
-        let lines = merger.merge(ocr: ocrLines, fragments: accessibilityFragments)
+        let lines = merger.merge(ocr: ocrLines, fragments: accessibilityFragments, within: region.rect)
         let blocks = grouper.group(lines)
         let fullText = blocks.map(\.text).joined(separator: "\n")
         let detected = fullText.isEmpty ? nil : detector?.detectLanguage(of: fullText)

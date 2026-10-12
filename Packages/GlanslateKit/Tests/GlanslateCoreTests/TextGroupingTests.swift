@@ -83,6 +83,15 @@ struct TextGroupingTests {
         #expect(blocks.map(\.text) == ["Screen Recording"])
     }
 
+    @Test func rightToLeftFragmentsAreReunitedRightToLeft() {
+        // "Welcome" on the right, "to the app" on the left: Arabic reads from the right.
+        let blocks = grouper.group([
+            line("في التطبيق", x: 100, y: 10, width: 90),
+            line("مرحبا بكم", x: 196, y: 10, width: 80),
+        ])
+        #expect(blocks.map(\.text) == ["مرحبا بكم في التطبيق"])
+    }
+
     @Test func distantItemsOnARowStaySeparateAndReadLeftToRight() {
         let blocks = grouper.group([
             line("Size", x: 400, y: 10, width: 40),
@@ -152,6 +161,18 @@ struct AccessibilityMergeTests {
         let ocr = [line("Visible", x: 10, y: 10, width: 60)]
         let fragments = [AccessibleTextFragment(text: "Hidden offscreen label", frame: CGRect(x: 10, y: 300, width: 160, height: 18))]
         #expect(merger.merge(ocr: ocr, fragments: fragments).map(\.text) == ["Visible"])
+    }
+
+    @Test func fragmentsExtendingPastTheSelectionAreIgnored() {
+        let selection = CGRect(x: 0, y: 0, width: 200, height: 40)
+        let ocr = [line("Customer name: Jane Smith", x: 10, y: 10, width: 185)]
+        // One element whose text continues past the selection's right edge.
+        let wider = AccessibleTextFragment(text: "Customer name: Jane Smith SSN 123456789", frame: CGRect(x: 8, y: 8, width: 300, height: 20))
+        #expect(merger.merge(ocr: ocr, fragments: [wider], within: selection).map(\.text) == ["Customer name: Jane Smith"])
+
+        let inside = AccessibleTextFragment(text: "Customer name: Jane Smith", frame: CGRect(x: 8, y: 8, width: 190, height: 20))
+        let merged = merger.merge(ocr: ocr, fragments: [inside], within: selection)
+        #expect(merged.map(\.source) == [.accessibility], "Fragments inside the selection still apply")
     }
 
     @Test func unrelatedTextIsNotSubstituted() {

@@ -76,7 +76,18 @@ public final class SavedTranslationStore {
         } else {
             context.insert(SavedTranslation(draft: draft))
         }
-        try context.save()
+        try commit()
+    }
+
+    /// Saves pending changes, or discards them when saving fails so the context — and
+    /// every list showing it — keeps matching what is actually on disk.
+    private func commit() throws {
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 
     public func item(id: UUID) -> SavedTranslation? {
@@ -113,16 +124,21 @@ public final class SavedTranslationStore {
     public func delete(id: UUID) throws {
         guard let item = item(id: id) else { return }
         context.delete(item)
-        try context.save()
+        try commit()
     }
 
     public func delete(_ item: SavedTranslation) throws {
         context.delete(item)
-        try context.save()
+        try commit()
     }
 
     public func deleteAll() throws {
-        try context.delete(model: SavedTranslation.self)
-        try context.save()
+        do {
+            try context.delete(model: SavedTranslation.self)
+        } catch {
+            context.rollback()
+            throw error
+        }
+        try commit()
     }
 }

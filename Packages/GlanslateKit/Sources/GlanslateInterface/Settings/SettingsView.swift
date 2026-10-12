@@ -235,6 +235,7 @@ struct SavedSettingsView: View {
     @Environment(AppEnvironment.self) private var app
     @State private var count = 0
     @State private var confirmClear = false
+    @State private var clearFailed = false
 
     var body: some View {
         @Bindable var settings = app.settings
@@ -243,8 +244,8 @@ struct SavedSettingsView: View {
                 LabeledContent("Saved translations", value: count.formatted())
                 Toggle("Save an image of the captured area", isOn: $settings.savesThumbnails)
             } footer: {
-                if app.isStoreTemporary {
-                    Label("Glanslate couldn’t open its saved translations file, so new pins last only until you quit. Restart Glanslate to try again.", systemImage: "exclamationmark.triangle.fill")
+                if app.store == nil {
+                    Label("Glanslate couldn’t open its saved translations file, so pinning is off. Restart Glanslate to try again.", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 } else {
                     Text("Pin a translation from the overlay toolbar to keep it. Saved translations are stored only on this Mac.")
@@ -265,11 +266,20 @@ struct SavedSettingsView: View {
         .onAppear(perform: refresh)
         .confirmationDialog("Clear all saved translations?", isPresented: $confirmClear) {
             Button("Clear All", role: .destructive) {
-                try? app.store?.deleteAll()
+                do {
+                    try app.store?.deleteAll()
+                } catch {
+                    clearFailed = true
+                }
                 refresh()
             }
         } message: {
             Text("This removes \(count) saved translations from this Mac. This can’t be undone.")
+        }
+        .alert("Couldn’t Clear Saved Translations", isPresented: $clearFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Glanslate couldn’t remove them from this Mac, so they’re still saved. Try again, or restart Glanslate.")
         }
     }
 

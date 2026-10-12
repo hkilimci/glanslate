@@ -9,7 +9,7 @@ struct SavedTranslationsView: View {
 
     var body: some View {
         if let store = app.store {
-            SavedTranslationsBrowser()
+            SavedTranslationsBrowser(store: store)
                 .modelContainer(store.container)
         } else {
             ContentUnavailableView(
@@ -22,11 +22,16 @@ struct SavedTranslationsView: View {
 }
 
 private struct SavedTranslationsBrowser: View {
-    @Environment(\.modelContext) private var context
+    let store: SavedTranslationStore
     @Query(sort: \SavedTranslation.createdAt, order: .reverse) private var items: [SavedTranslation]
     @State private var selection: UUID?
     @State private var search = ""
     @State private var confirmClear = false
+    @State private var deleteFailed = false
+
+    init(store: SavedTranslationStore) {
+        self.store = store
+    }
 
     private var filtered: [SavedTranslation] {
         let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -93,17 +98,28 @@ private struct SavedTranslationsBrowser: View {
         } message: {
             Text("This removes \(items.count) saved translations from this Mac. This can’t be undone.")
         }
+        .alert("Couldn’t Delete", isPresented: $deleteFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Glanslate couldn’t remove it from this Mac, so it’s still saved. Try again, or restart Glanslate.")
+        }
         .onAppear {
             if selection == nil { selection = items.first?.id }
         }
     }
 
     private func delete(_ item: SavedTranslation) {
-        let index = filtered.firstIndex { $0.id == item.id }
-        context.delete(item)
-        try? context.save()
-        if selection == item.id {
-            let remaining = filtered.filter { $0.id != item.id }
+        // Read everything needed first; a deleted model's properties aren't safe to use.
+        let id = item.id
+        let index = filtered.firstIndex { $0.id == id }
+        let remaining = filtered.filter { $0.id != id }
+        do {
+            try store.delete(item)
+        } catch {
+            deleteFailed = true
+            return
+        }
+        if selection == id {
             if let index, !remaining.isEmpty {
                 selection = remaining[min(index, remaining.count - 1)].id
             } else {
@@ -113,9 +129,12 @@ private struct SavedTranslationsBrowser: View {
     }
 
     private func deleteAll() {
-        try? context.delete(model: SavedTranslation.self)
-        try? context.save()
-        selection = nil
+        do {
+            try store.deleteAll()
+            selection = nil
+        } catch {
+            deleteFailed = true
+        }
     }
 }
 

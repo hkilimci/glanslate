@@ -7,20 +7,27 @@ import Foundation
 /// lines it covers only when the two clearly describe the same text, and each
 /// OCR line is consumed at most once, so nothing is duplicated. Fragments with
 /// no visible OCR counterpart are ignored: they may be scrolled out of view or
-/// hidden behind another window.
+/// hidden behind another window. So are fragments that extend past the
+/// selection, since their full text includes characters the user didn't select.
 public struct AccessibilityTextMerger: Sendable {
     /// Minimum bigram similarity between fragment and OCR text.
     public var minimumSimilarity: Double = 0.55
 
     public init() {}
 
-    public func merge(ocr lines: [RecognizedLine], fragments: [AccessibleTextFragment]) -> [RecognizedLine] {
+    /// - Parameter selection: The selected region, in the same space as the frames.
+    ///   Fragments must lie inside it, give or take a fraction of a line.
+    public func merge(ocr lines: [RecognizedLine], fragments: [AccessibleTextFragment], within selection: CGRect? = nil) -> [RecognizedLine] {
         guard !lines.isEmpty, !fragments.isEmpty else { return lines }
         let typicalHeight = TextBlock.median(lines.map(\.frame.height))
+        // Element frames often include a little padding around their text.
+        let slack = max(2, typicalHeight * 0.3)
+        let allowed = selection?.insetBy(dx: -slack, dy: -slack)
 
         // Most specific fragments first, so a link nested in a paragraph wins over the paragraph.
         let candidates = deduplicated(fragments)
             .filter { $0.frame.height > 0 && $0.frame.height <= typicalHeight * 2.2 }
+            .filter { fragment in allowed.map { $0.contains(fragment.frame) } ?? true }
             .sorted { $0.frame.area < $1.frame.area }
 
         var consumed: Set<UUID> = []
@@ -28,10 +35,11 @@ public struct AccessibilityTextMerger: Sendable {
 
         for fragment in candidates {
             let zone = fragment.frame.insetBy(dx: -2, dy: -2)
+            let rightToLeft = TextGrouper.isRightToLeft(fragment.text)
             let matched = lines
                 .filter { !consumed.contains($0.id) }
                 .filter { zone.contains($0.frame.center) && $0.frame.verticalOverlapRatio(with: fragment.frame) >= 0.5 }
-                .sorted { $0.frame.minX < $1.frame.minX }
+                .sorted { rightToLeft ? $0.frame.maxX > $1.frame.maxX : $0.frame.minX < $1.frame.minX }
             guard !matched.isEmpty else { continue }
 
             let fragmentText = TextGrouper.collapseWhitespace(fragment.text)

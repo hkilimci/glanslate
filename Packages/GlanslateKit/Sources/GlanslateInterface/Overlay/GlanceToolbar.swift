@@ -74,7 +74,7 @@ struct GlanceToolbar: View {
             .buttonStyle(ToolbarIconButtonStyle(isActive: session.isPinned))
             .keyboardShortcut("s", modifiers: .command)
             .disabled(session.result == nil || !context.canPin)
-            .help(session.isPinned ? "Remove from Saved Translations (⌘S)" : "Save to Saved Translations (⌘S)")
+            .help(pinHelp)
             .accessibilityLabel(session.isPinned ? "Unpin" : "Pin to Saved Translations")
 
             Button(action: actions.toggleReveal) {
@@ -105,6 +105,11 @@ struct GlanceToolbar: View {
         }
         .padding(5)
         .toolbarSurface(in: Capsule())
+    }
+
+    private var pinHelp: String {
+        if !context.canPin { return "Saved Translations is unavailable. Restart Glanslate to try again." }
+        return session.isPinned ? "Remove from Saved Translations (⌘S)" : "Save to Saved Translations (⌘S)"
     }
 
     private var separator: some View {

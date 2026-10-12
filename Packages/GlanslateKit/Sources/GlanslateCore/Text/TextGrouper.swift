@@ -45,10 +45,12 @@ public struct TextGrouper: Sendable {
     }
 
     static func joinRow(_ left: RecognizedLine, _ right: RecognizedLine) -> RecognizedLine {
-        let separator = needsSpace(between: left.text, and: right.text) ? " " : ""
+        // Right-to-left text starts with the fragment on the right.
+        let (first, second) = isRightToLeft(left.text + right.text) ? (right, left) : (left, right)
+        let separator = needsSpace(between: first.text, and: second.text) ? " " : ""
         return RecognizedLine(
             id: left.id,
-            text: collapseWhitespace(left.text) + separator + collapseWhitespace(right.text),
+            text: collapseWhitespace(first.text) + separator + collapseWhitespace(second.text),
             frame: left.frame.union(right.frame),
             confidence: min(left.confidence, right.confidence),
             source: left.source == .accessibility && right.source == .accessibility ? .accessibility : .ocr
@@ -178,6 +180,26 @@ public struct TextGrouper: Sendable {
              0xF900...0xFAFF, // CJK compatibility ideographs
              0xFF00...0xFFEF, // Halfwidth and fullwidth forms
              0x0E00...0x0E7F: // Thai
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether most of the text's letters belong to a right-to-left script.
+    static func isRightToLeft(_ text: String) -> Bool {
+        var rightToLeft = 0, other = 0
+        for scalar in text.unicodeScalars where scalar.properties.isAlphabetic {
+            if isRightToLeftScript(scalar) { rightToLeft += 1 } else { other += 1 }
+        }
+        return rightToLeft > other
+    }
+
+    static func isRightToLeftScript(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x0590...0x08FF, // Hebrew, Arabic, Syriac, Thaana, N'Ko, Samaritan, Mandaic, Arabic extensions
+             0xFB1D...0xFDFF, // Hebrew and Arabic presentation forms
+             0xFE70...0xFEFF: // Arabic presentation forms B
             return true
         default:
             return false
