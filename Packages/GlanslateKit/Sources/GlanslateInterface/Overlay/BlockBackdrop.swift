@@ -20,7 +20,7 @@ enum BackdropRenderer {
 
     /// Renders backdrops for display-local block frames, off the main thread.
     static func render(capture: CapturedImage, frames: [UUID: CGRect]) async -> [UUID: BlockBackdrop] {
-        await Task.detached(priority: .userInitiated) {
+        let rendering = Task.detached(priority: .userInitiated) {
             var result: [UUID: BlockBackdrop] = [:]
             for (id, frame) in frames {
                 if Task.isCancelled { break }
@@ -28,7 +28,13 @@ enum BackdropRenderer {
                 result[id] = makeBackdrop(from: crop, scale: capture.scale, lineHeight: frame.height)
             }
             return result
-        }.value
+        }
+        // Detached work doesn't inherit cancellation; forward it so superseded backdrops stop rendering.
+        return await withTaskCancellationHandler {
+            await rendering.value
+        } onCancel: {
+            rendering.cancel()
+        }
     }
 
     static func makeBackdrop(from image: CGImage, scale: CGFloat, lineHeight: CGFloat) -> BlockBackdrop {

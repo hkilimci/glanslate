@@ -150,8 +150,57 @@ struct OpenAIAdapterTests {
     }
 }
 
+/// Consent the test can revoke while a translation is running.
+private actor SwitchableConsent: ConsentGate {
+    private var revoked: Set<TranslationProvider> = []
+    func requestConsent(for provider: TranslationProvider) async -> Bool { !revoked.contains(provider) }
+    func hasConsent(for provider: TranslationProvider) async -> Bool { !revoked.contains(provider) }
+    func revoke(_ provider: TranslationProvider) { revoked.insert(provider) }
+}
+
+/// Runs a hook after each request reaches the stub, while the engine is still waiting on it.
+private struct HookedTransport: HTTPTransport {
+    let base: StubTransport
+    let afterSend: @Sendable () async -> Void
+
+    func send(_ request: URLRequest) async throws -> HTTPResponse {
+        let response = try await base.send(request)
+        await afterSend()
+        return response
+    }
+}
+
 @Suite("HTTP handling")
 struct HTTPHandlingTests {
+    @Test func consentRevokedMidTranslationStopsLaterBatches() async {
+        let consent = SwitchableConsent()
+        let first = (0..<50).map { #"{"text":"t\#($0)"}"# }.joined(separator: ",")
+        let stub = StubTransport([.success(HTTPResponse(status: 200, body: Data(#"{"translations":[\#(first)]}"#.utf8)))])
+        // The user switches DeepL off while its first batch is in flight.
+        let hooked = HookedTransport(base: stub) { await consent.revoke(.deepL) }
+        let transport = ConsentCheckingTransport(provider: .deepL, consent: consent, base: hooked)
+        let engine = DeepLEngine(credentials: FixedCredentials(keys: [.deepL: "k"]), transport: transport)
+        await #expect(throws: GlanslateError.consentDeclined(.deepL)) {
+            try await engine.translate((0..<120).map { "Paragraph \($0)" }, source: nil, target: .german)
+        }
+        #expect(stub.requestCount == 1, "Later batches never reach the network")
+    }
+
+    @Test func consentRevokedBeforeARetryStopsIt() async {
+        let consent = SwitchableConsent()
+        let stub = StubTransport([
+            .success(HTTPResponse(status: 503, body: Data())),
+            .success(HTTPResponse(status: 200, body: Data(#"{"translations":[{"text":"ok"}]}"#.utf8))),
+        ])
+        let hooked = HookedTransport(base: stub) { await consent.revoke(.deepL) }
+        let transport = ConsentCheckingTransport(provider: .deepL, consent: consent, base: hooked)
+        let engine = DeepLEngine(credentials: FixedCredentials(keys: [.deepL: "k"]), transport: transport)
+        await #expect(throws: GlanslateError.consentDeclined(.deepL)) {
+            try await engine.translate(["x"], source: nil, target: .english)
+        }
+        #expect(stub.requestCount == 1, "The retry isn't sent once consent is gone")
+    }
+
     @Test func transientServerErrorsAreRetriedOnce() async throws {
         let transport = StubTransport([
             .success(HTTPResponse(status: 503, body: Data())),

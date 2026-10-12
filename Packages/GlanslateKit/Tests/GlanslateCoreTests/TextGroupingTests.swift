@@ -118,6 +118,31 @@ struct TextGroupingTests {
         ])
     }
 
+    @Test func rightToLeftColumnsReadTheRightColumnFirst() {
+        let title = "عنوان المقال عبر العمودين"
+        let rightFirst = "الفقرة الأولى في العمود الأيمن"
+        let rightSecond = "الفقرة الثانية في العمود الأيمن"
+        let leftFirst = "الفقرة الأولى في العمود الأيسر"
+        let leftSecond = "الفقرة الثانية في العمود الأيسر"
+        let blocks = grouper.group([
+            line(title, x: 20, y: 10, width: 560, height: 28),
+            line(leftFirst, x: 20, y: 60, width: 260),
+            line(rightFirst, x: 320, y: 60, width: 250),
+            line(leftSecond, x: 20, y: 120, width: 240),
+            line(rightSecond, x: 320, y: 140, width: 245),
+        ])
+        #expect(blocks.map(\.text) == [title, rightFirst, rightSecond, leftFirst, leftSecond])
+    }
+
+    @Test func distantRightToLeftItemsOnARowReadFromTheRight() {
+        let blocks = grouper.group([
+            line("الحجم", x: 400, y: 10, width: 40),
+            line("الاسم", x: 10, y: 10, width: 44),
+            line("النوع", x: 600, y: 10, width: 36),
+        ])
+        #expect(blocks.map(\.text) == ["النوع", "الحجم", "الاسم"])
+    }
+
     @Test func emptyAndDegenerateLinesAreIgnored() {
         let blocks = grouper.group([
             line("   ", x: 10, y: 10, width: 40),

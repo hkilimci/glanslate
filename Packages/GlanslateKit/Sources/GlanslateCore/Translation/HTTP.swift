@@ -58,6 +58,27 @@ public struct URLSessionTransport: HTTPTransport {
     }
 }
 
+/// Sends one cloud provider's requests only while the user's consent to it is on
+/// record. Checked before every request — each batch and each retry — so consent
+/// revoked during a translation stops any text that hasn't been sent yet.
+public struct ConsentCheckingTransport: HTTPTransport {
+    private let provider: TranslationProvider
+    private let consent: any ConsentGate
+    private let base: any HTTPTransport
+
+    public init(provider: TranslationProvider, consent: any ConsentGate, base: any HTTPTransport) {
+        self.provider = provider
+        self.consent = consent
+        self.base = base
+    }
+
+    public func send(_ request: URLRequest) async throws -> HTTPResponse {
+        guard await consent.hasConsent(for: provider) else { throw GlanslateError.consentDeclined(provider) }
+        try Task.checkCancellation()
+        return try await base.send(request)
+    }
+}
+
 /// Runs provider requests with cancellation, one bounded retry for transient
 /// server errors, and translation of transport failures into ``GlanslateError``.
 struct ProviderClient: Sendable {

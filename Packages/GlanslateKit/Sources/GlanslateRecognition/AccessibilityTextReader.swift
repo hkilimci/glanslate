@@ -21,9 +21,15 @@ public struct AccessibilityTextReader: Sendable {
         guard Self.isAvailable, quartzRect.width > 0, quartzRect.height > 0 else { return [] }
         let budget = timeBudget
         let limit = maximumElements
-        return await Task.detached(priority: .userInitiated) {
+        let walk = Task.detached(priority: .userInitiated) {
             Walker(rect: quartzRect, deadline: ContinuousClock.now + budget, limit: limit).run()
-        }.value
+        }
+        // Detached work doesn't inherit cancellation; forward it so an abandoned glance stops walking.
+        return await withTaskCancellationHandler {
+            await walk.value
+        } onCancel: {
+            walk.cancel()
+        }
     }
 }
 

@@ -217,16 +217,32 @@ public struct TextGrouper: Sendable {
     /// Blocks are cut into rows along horizontal gaps. Wide blocks (headings,
     /// full-width paragraphs) separate sections; inside a section, staggered
     /// narrow blocks read column by column (articles), while rows whose items
-    /// line up read row by row (tables, forms, toolbars).
+    /// line up read row by row (tables, forms, toolbars). Right-to-left text reads
+    /// its columns and row items from the right.
     static func readingOrder(_ blocks: [TextBlock]) -> [TextBlock] {
+        readingOrder(blocks, rightToLeft: isRightToLeft(blocks.map(\.text).joined()))
+    }
+
+    private static func readingOrder(_ blocks: [TextBlock], rightToLeft: Bool) -> [TextBlock] {
         guard blocks.count > 1 else { return blocks }
+        func order(_ blocks: [TextBlock]) -> [TextBlock] { readingOrder(blocks, rightToLeft: rightToLeft) }
+        /// Groups side by side, in the order they are read.
+        func columnsInReadingOrder(_ blocks: [TextBlock]) -> [[TextBlock]] {
+            let columns = split(blocks, vertical: false)
+            return rightToLeft ? columns.reversed() : columns
+        }
+
         let rows = split(blocks, vertical: true)
         guard rows.count > 1 else {
-            let columns = split(blocks, vertical: false)
+            let columns = columnsInReadingOrder(blocks)
             guard columns.count > 1 else {
-                return blocks.sorted { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) }
+                return blocks.sorted {
+                    rightToLeft
+                        ? ($0.frame.minY, -$0.frame.maxX) < ($1.frame.minY, -$1.frame.maxX)
+                        : ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX)
+                }
             }
-            return columns.flatMap(readingOrder)
+            return columns.flatMap(order)
         }
 
         let totalWidth = blocks.reduce(CGRect.null) { $0.union($1.frame) }.width
@@ -236,11 +252,11 @@ public struct TextGrouper: Sendable {
         func flushSection() {
             guard !section.isEmpty else { return }
             let alignedRows = section.filter { split($0, vertical: false).count > 1 }.count
-            let columns = split(section.flatMap { $0 }, vertical: false)
+            let columns = columnsInReadingOrder(section.flatMap { $0 })
             if columns.count > 1, alignedRows * 2 < section.count {
-                ordered += columns.flatMap(readingOrder)
+                ordered += columns.flatMap(order)
             } else {
-                ordered += section.flatMap(readingOrder)
+                ordered += section.flatMap(order)
             }
             section = []
         }
@@ -248,7 +264,7 @@ public struct TextGrouper: Sendable {
         for row in rows {
             if row.contains(where: { $0.frame.width >= 0.6 * totalWidth }) {
                 flushSection()
-                ordered += readingOrder(row)
+                ordered += order(row)
             } else {
                 section.append(row)
             }

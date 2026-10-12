@@ -120,7 +120,9 @@ public final class PermissionMonitor {
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1.5))
-                self?.refresh()
+                // Stop once the monitor is gone; otherwise the loop would spin on forever.
+                guard !Task.isCancelled, let self else { return }
+                self.refresh()
             }
         }
     }

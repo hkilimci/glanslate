@@ -184,14 +184,18 @@ final class GlanceController {
     }
 
     private func makeRouter() -> TranslationRouter {
-        TranslationRouter(
+        let consent = ConsentPrompter(settings: settings)
+        func guarded(_ provider: TranslationProvider) -> any HTTPTransport {
+            ConsentCheckingTransport(provider: provider, consent: consent, base: transport)
+        }
+        return TranslationRouter(
             engines: [
                 AppleTranslationEngine(),
-                DeepLEngine(credentials: credentials, transport: transport),
-                GoogleTranslateEngine(credentials: credentials, transport: transport),
-                OpenAIEngine(credentials: credentials, transport: transport, model: settings.openAIModel),
+                DeepLEngine(credentials: credentials, transport: guarded(.deepL)),
+                GoogleTranslateEngine(credentials: credentials, transport: guarded(.google)),
+                OpenAIEngine(credentials: credentials, transport: guarded(.openAI), model: settings.openAIModel),
             ],
-            consent: ConsentPrompter(settings: settings),
+            consent: consent,
             detector: NaturalLanguageDetector()
         )
     }
