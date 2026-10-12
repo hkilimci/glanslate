@@ -46,6 +46,7 @@ jobs:
       - name: Test package
         run: swift test --skip-build --package-path Packages/GlanslateKit 2>&1 | tail -60
       - name: Render interface snapshots
+        id: snapshots
         timeout-minutes: 6
         continue-on-error: true
         run: |
@@ -62,10 +63,21 @@ jobs:
           retention-days: 14
       - name: Commit snapshots
         # Opt-in: include [snapshots] in a commit message to refresh Docs/Screenshots.
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[snapshots]')
+        # Only a successful render replaces the committed images; the render step's
+        # continue-on-error would otherwise let a failed or timed-out run delete them.
+        if: >-
+          github.event_name == 'push'
+          && contains(github.event.head_commit.message, '[snapshots]')
+          && steps.snapshots.outcome == 'success'
         run: |
+          shopt -s nullglob
+          rendered=(snapshots/*.png)
+          if (( ${#rendered[@]} == 0 )); then
+            echo "No snapshots were rendered; keeping Docs/Screenshots."
+            exit 0
+          fi
           rm -rf Docs/Screenshots && mkdir -p Docs/Screenshots
-          cp snapshots/*.png Docs/Screenshots/ 2>/dev/null || true
+          cp "${rendered[@]}" Docs/Screenshots/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Docs/Screenshots
