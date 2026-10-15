@@ -275,7 +275,7 @@ struct OverlayScene {
         let context = ToolbarContext()
         context.configuredProviders = [.apple, .deepL]
         let actions = GlanceToolbarActions(
-            dismiss: {}, copy: {}, togglePin: {}, toggleReveal: {},
+            dismiss: {}, translateRegion: {}, copy: {}, togglePin: {}, toggleReveal: {},
             setSource: { _ in }, setTarget: { _ in }, setProvider: { _ in }, setStyle: { _ in }, recover: { _ in }
         )
 

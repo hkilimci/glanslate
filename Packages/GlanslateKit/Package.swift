@@ -39,6 +39,7 @@ targets += [
     ),
     .testTarget(name: "GlanslatePersistenceTests", dependencies: ["GlanslatePersistence", "GlanslateCore"]),
     .testTarget(name: "GlanslateSystemTests", dependencies: ["GlanslateSystem", "GlanslateCore"]),
+    .testTarget(name: "GlanslateAppleTranslationTests", dependencies: ["GlanslateAppleTranslation", "GlanslateCore"]),
     .testTarget(
         name: "GlanslateInterfaceTests",
         dependencies: ["GlanslateInterface", "GlanslateCore", "GlanslateSystem", "GlanslatePersistence"]

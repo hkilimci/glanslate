@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 struct GlanceToolbarActions {
     var dismiss: @MainActor () -> Void
+    var translateRegion: @MainActor () -> Void
     var copy: @MainActor () -> Void
     var togglePin: @MainActor () -> Void
     var toggleReveal: @MainActor () -> Void
@@ -54,6 +55,14 @@ struct GlanceToolbar: View {
             .keyboardShortcut(.cancelAction)
             .help("Close (esc)")
             .accessibilityLabel("Close")
+
+            Button(action: actions.translateRegion) {
+                Image(systemName: "viewfinder")
+            }
+            .buttonStyle(ToolbarIconButtonStyle())
+            .keyboardShortcut("n", modifiers: .command)
+            .help("Translate Another Region (⌘N)")
+            .accessibilityLabel("Translate another region")
 
             separator
 

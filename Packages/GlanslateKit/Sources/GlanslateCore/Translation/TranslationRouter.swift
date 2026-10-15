@@ -214,7 +214,9 @@ public struct TranslationRouter: Sendable {
     ) async throws -> EngineResult {
         guard let engine = engines[provider] else { throw GlanslateError.noProviderAvailable }
 
-        switch await engine.readiness(source: source, target: target) {
+        let readiness = await engine.readiness(source: source, target: target)
+        try Task.checkCancellation()
+        switch readiness {
         case .ready: break
         case .needsSourceLanguage: throw GlanslateError.sourceLanguageUndetermined
         case .missingCredential: throw GlanslateError.missingCredential(provider)

@@ -68,6 +68,7 @@ Without Accessibility access, Glanslate works fully from the screen image alone 
 | Control | Action | Key |
 |---|---|---|
 | ✕ | Close the overlay | esc |
+| Viewfinder | Select and translate another region | ⌘N |
 | Copy | Copy the translation | ⌘C |
 | Pin | Save to, or remove from, Saved Translations | ⌘S |
 | Eye | Show the original (hold ⌥ for a quick peek) | ⌘O |

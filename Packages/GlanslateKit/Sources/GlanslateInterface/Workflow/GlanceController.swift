@@ -217,6 +217,7 @@ final class GlanceController {
     private func actions(for session: GlanceSession) -> GlanceToolbarActions {
         GlanceToolbarActions(
             dismiss: { [weak self] in self?.dismiss() },
+            translateRegion: { [weak self] in self?.translateRegion() },
             copy: { [weak self, weak session] in
                 guard let session, let result = session.result else { return }
                 Pasteboard.copy(result.translatedText)

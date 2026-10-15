@@ -175,7 +175,9 @@ struct AppleTranslationSection: View {
 
     private func refresh() async {
         status = nil
-        status = await AppleLanguageSupport.status(source: source, target: target)
+        let refreshed = await AppleLanguageSupport.status(source: source, target: target)
+        guard !Task.isCancelled else { return }
+        status = refreshed
     }
 
     private func download() {

@@ -10,12 +10,15 @@ import GlanslateCore
 /// Settings, where a SwiftUI-hosted session is allowed to request downloads.
 public struct AppleTranslationEngine: TranslationEngine {
     public let provider = TranslationProvider.apple
+    private let client: any AppleTranslationClient
 
-    public init() {}
+    public init() { client = SystemAppleTranslationClient() }
+
+    init(client: any AppleTranslationClient) { self.client = client }
 
     public func readiness(source: Language?, target: Language) async -> EngineReadiness {
         guard let source else { return .needsSourceLanguage }
-        switch await AppleLanguageSupport.status(source: source, target: target) {
+        switch await AppleLanguageSupport.status(source: source, target: target, client: client) {
         case .installed: return .ready
         case .downloadable: return .modelsNotInstalled
         case .unsupported: return .unsupportedPair
@@ -24,31 +27,13 @@ public struct AppleTranslationEngine: TranslationEngine {
 
     public func translate(_ texts: [String], source: Language?, target: Language) async throws -> EngineResult {
         guard let source else { throw GlanslateError.sourceLanguageUndetermined }
-        let session = TranslationSession(
-            installedSource: AppleLanguageSupport.localeLanguage(for: source),
-            target: AppleLanguageSupport.localeLanguage(for: target)
-        )
-        let requests = texts.enumerated().map {
-            TranslationSession.Request(sourceText: $0.element, clientIdentifier: String($0.offset))
-        }
-
-        let responses: [TranslationSession.Response]
         do {
-            responses = try await session.translations(from: requests)
+            return try await retryMissingAppleModels {
+                try await client.translate(texts, source: source, target: target)
+            }
         } catch {
             throw Self.map(error, source: source, target: target)
         }
-        try Task.checkCancellation()
-
-        var byIndex: [Int: String] = [:]
-        for response in responses {
-            if let identifier = response.clientIdentifier, let index = Int(identifier) {
-                byIndex[index] = response.targetText
-            }
-        }
-        let ordered = texts.indices.compactMap { byIndex[$0] }
-        guard ordered.count == texts.count else { throw GlanslateError.incompleteResponse(.apple) }
-        return EngineResult(texts: ordered, detectedSource: source)
     }
 
     static func map(_ error: any Error, source: Language, target: Language) -> any Error {
@@ -63,7 +48,77 @@ public struct AppleTranslationEngine: TranslationEngine {
         }
         if TranslationError.unableToIdentifyLanguage ~= error { return GlanslateError.sourceLanguageUndetermined }
         if TranslationError.nothingToTranslate ~= error { return GlanslateError.noTextFound }
+        if let error = error as? GlanslateError { return error }
         return GlanslateError.providerFailure(.apple, detail: String(describing: type(of: error)))
+    }
+}
+
+/// Keeps framework calls replaceable in tests without downloading or removing system models.
+protocol AppleTranslationClient: Sendable {
+    func status(source: Language, target: Language) async -> AppleLanguageSupport.Status
+    func prepare(source: Language, target: Language) async throws
+    func translate(_ texts: [String], source: Language, target: Language) async throws -> EngineResult
+}
+
+private struct SystemAppleTranslationClient: AppleTranslationClient {
+    func status(source: Language, target: Language) async -> AppleLanguageSupport.Status {
+        let availability = LanguageAvailability()
+        switch await availability.status(
+            from: AppleLanguageSupport.localeLanguage(for: source),
+            to: AppleLanguageSupport.localeLanguage(for: target)
+        ) {
+        case .installed: return .installed
+        case .supported: return .downloadable
+        case .unsupported: return .unsupported
+        @unknown default: return .unsupported
+        }
+    }
+
+    func prepare(source: Language, target: Language) async throws {
+        let session = TranslationSession(
+            installedSource: AppleLanguageSupport.localeLanguage(for: source),
+            target: AppleLanguageSupport.localeLanguage(for: target)
+        )
+        try await session.prepareTranslation()
+    }
+
+    func translate(_ texts: [String], source: Language, target: Language) async throws -> EngineResult {
+        let session = TranslationSession(
+            installedSource: AppleLanguageSupport.localeLanguage(for: source),
+            target: AppleLanguageSupport.localeLanguage(for: target)
+        )
+        let requests = texts.enumerated().map {
+            TranslationSession.Request(sourceText: $0.element, clientIdentifier: String($0.offset))
+        }
+
+        let responses = try await session.translations(from: requests)
+        try Task.checkCancellation()
+
+        var byIndex: [Int: String] = [:]
+        for response in responses {
+            if let identifier = response.clientIdentifier, let index = Int(identifier) {
+                byIndex[index] = response.targetText
+            }
+        }
+        let ordered = texts.indices.compactMap { byIndex[$0] }
+        guard ordered.count == texts.count else { throw GlanslateError.incompleteResponse(.apple) }
+        return EngineResult(texts: ordered, detectedSource: source)
+    }
+}
+
+/// Model discovery can lag the first request after macOS starts its translation service.
+/// Retry only a missing-model error, once, with a fresh session after a short grace period.
+private func retryMissingAppleModels<Value: Sendable>(
+    _ operation: @Sendable () async throws -> Value
+) async throws -> Value {
+    try Task.checkCancellation()
+    do {
+        return try await operation()
+    } catch {
+        guard TranslationError.notInstalled ~= error else { throw error }
+        try await Task.sleep(for: .milliseconds(250))
+        try Task.checkCancellation()
+        return try await operation()
     }
 }
 
@@ -76,13 +131,22 @@ public enum AppleLanguageSupport {
     }
 
     public static func status(source: Language, target: Language) async -> Status {
+        await status(source: source, target: target, client: SystemAppleTranslationClient())
+    }
+
+    static func status(source: Language, target: Language, client: any AppleTranslationClient) async -> Status {
         guard source != target else { return .unsupported }
-        let availability = LanguageAvailability()
-        switch await availability.status(from: localeLanguage(for: source), to: localeLanguage(for: target)) {
-        case .installed: return .installed
-        case .supported: return .downloadable
-        case .unsupported: return .unsupported
-        @unknown default: return .unsupported
+        let status = await client.status(source: source, target: target)
+        guard status == .downloadable, !Task.isCancelled else { return status }
+        do {
+            // Availability can be stale on first use. Verify with a session that cannot
+            // request downloads before telling the user to download already installed models.
+            try await retryMissingAppleModels {
+                try await client.prepare(source: source, target: target)
+            }
+            return .installed
+        } catch {
+            return status
         }
     }
 

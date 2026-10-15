@@ -63,6 +63,16 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "GlanslateAppleTranslationTests"
+               BuildableName = "GlanslateAppleTranslationTests"
+               BlueprintName = "GlanslateAppleTranslationTests"
+               ReferencedContainer = "container:Packages/GlanslateKit">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "GlanslateInterfaceTests"
                BuildableName = "GlanslateInterfaceTests"
                BlueprintName = "GlanslateInterfaceTests"
