@@ -30,6 +30,15 @@ struct InterfaceSnapshotTests {
         }
     }
 
+    @Test func softwareUpdate() async throws {
+        for dark in [false, true] {
+            let environment = try Fixtures.environment(update: .success(.available(.sample())))
+            await environment.updates?.runCheck(userInitiated: true)
+            environment.settingsSection = .about
+            try render(SettingsView().environment(environment), size: CGSize(width: 760, height: 580), dark: dark, name: "settings-about-update")
+        }
+    }
+
     @Test func onboardingSteps() throws {
         for dark in [false, true] {
             for step in OnboardingView.Step.allCases {
@@ -136,7 +145,9 @@ struct InterfaceSnapshotTests {
 
 @MainActor
 enum Fixtures {
-    static func environment() throws -> AppEnvironment {
+    static func environment(
+        update: Result<UpdateCheckResult, UpdateError> = .success(.upToDate(latest: nil))
+    ) throws -> AppEnvironment {
         let suite = "glanslate.snapshots.\(UUID().uuidString)"
         let settings = AppSettings(defaults: UserDefaults(suiteName: suite)!)
         settings.targetLanguage = .english
@@ -144,7 +155,13 @@ enum Fixtures {
             settings: settings,
             permissions: PermissionMonitor(),
             credentials: PreviewCredentialStore(),
-            store: try SavedTranslationStore(inMemory: true)
+            store: try SavedTranslationStore(inMemory: true),
+            updates: UpdateController(
+                currentVersion: AppVersion("1.0.0")!,
+                settings: settings,
+                checker: StubUpdateChecker(update),
+                installer: StubUpdateInstaller()
+            )
         )
     }
 

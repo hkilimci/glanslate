@@ -15,6 +15,7 @@ public final class AppController: NSObject {
     private var glance: GlanceController!
     private var statusMenu: StatusMenuController?
     private var shortcutToken: HotKeyCenter.Token?
+    private let updateToast = ToastPresenter()
 
     override public init() {
         let settings = AppSettings()
@@ -31,7 +32,8 @@ public final class AppController: NSObject {
             settings: settings,
             permissions: PermissionMonitor(),
             credentials: KeychainCredentialStore(),
-            store: store
+            store: store,
+            updates: Self.makeUpdateController(settings: settings)
         )
         windows = WindowRouter(environment: environment)
         super.init()
@@ -57,8 +59,21 @@ public final class AppController: NSObject {
             applyShortcut: { [weak self] in self?.registerShortcut() },
             suspendShortcut: { [weak self] in self?.unregisterShortcut() },
             applyDockIcon: { [weak self] in self?.windows.updateActivationPolicy() },
-            showAbout: { [weak self] in self?.showAbout() }
+            showAbout: { [weak self] in self?.showAbout() },
+            checkForUpdates: { [weak self] in self?.checkForUpdates() }
         )
+        environment.updates?.onUpdateFound = { [weak self] update in self?.announce(update) }
+    }
+
+    /// Updates come from the GitHub repository named in Info.plist; builds without one don't check.
+    private static func makeUpdateController(settings: AppSettings) -> UpdateController? {
+        let info = Bundle.main.infoDictionary
+        guard let repository = info?["GlanslateUpdateRepository"] as? String,
+              let versionString = info?["CFBundleShortVersionString"] as? String,
+              let version = AppVersion(versionString),
+              let feed = GitHubReleaseFeed(repository: repository, appVersion: versionString)
+        else { return nil }
+        return UpdateController(currentVersion: version, settings: settings, checker: feed, installer: UpdateInstaller())
     }
 
     /// Call from `applicationDidFinishLaunching`.
@@ -67,6 +82,7 @@ public final class AppController: NSObject {
         statusMenu = StatusMenuController(environment: environment)
         windows.updateActivationPolicy()
         registerShortcut()
+        environment.updates?.startSchedule()
         if !environment.settings.hasCompletedOnboarding || !Permission.screenRecording.isGranted {
             showOnboarding()
         }
@@ -103,6 +119,11 @@ public final class AppController: NSObject {
         windows.show(.onboarding)
     }
 
+    func checkForUpdates() {
+        openSettings(.about)
+        environment.updates?.checkNow()
+    }
+
     func showAbout() {
         NSApp.activate()
         NSApp.orderFrontStandardAboutPanel(options: [
@@ -111,6 +132,17 @@ public final class AppController: NSObject {
                 attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]
             ),
         ])
+    }
+
+    private func announce(_ update: AvailableUpdate) {
+        guard let current = environment.updates?.currentVersion else { return }
+        updateToast.show(
+            title: "Glanslate \(update.version) is available",
+            message: "You have version \(current). See what’s new, then install it in a click.",
+            symbol: "arrow.down.circle.fill",
+            tint: .accentColor,
+            action: (title: "Update…", handler: { [weak self] in self?.openSettings(.about) })
+        )
     }
 
     private func finishOnboarding() {
@@ -146,4 +178,5 @@ public final class AppController: NSObject {
     @objc func openSettingsAction(_ sender: Any?) { openSettings(environment.settingsSection) }
     @objc func openSavedAction(_ sender: Any?) { openSavedTranslations() }
     @objc func aboutAction(_ sender: Any?) { showAbout() }
+    @objc func checkForUpdatesAction(_ sender: Any?) { checkForUpdates() }
 }

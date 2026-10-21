@@ -291,6 +291,8 @@ struct SavedSettingsView: View {
 // MARK: - About
 
 struct AboutSettingsView: View {
+    @Environment(AppEnvironment.self) private var app
+
     var body: some View {
         Form {
             Section {
@@ -310,6 +312,10 @@ struct AboutSettingsView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
+            }
+
+            if let updates = app.updates {
+                SoftwareUpdateSection(updates: updates)
             }
 
             Section("Privacy") {

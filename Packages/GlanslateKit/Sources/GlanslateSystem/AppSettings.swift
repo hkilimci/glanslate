@@ -42,6 +42,15 @@ public final class AppSettings {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Key.hasCompletedOnboarding.rawValue) }
     }
 
+    // MARK: Updates
+
+    public var checksForUpdates: Bool { didSet { defaults.set(checksForUpdates, forKey: Key.checksForUpdates.rawValue) } }
+    public var lastUpdateCheck: Date? { didSet { defaults.set(lastUpdateCheck, forKey: Key.lastUpdateCheck.rawValue) } }
+    /// A version the user chose to skip; automatic checks don't announce it.
+    public var skippedUpdateVersion: String? {
+        didSet { defaults.set(skippedUpdateVersion, forKey: Key.skippedUpdateVersion.rawValue) }
+    }
+
     @ObservationIgnored private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {
@@ -64,6 +73,9 @@ public final class AppSettings {
         showsDockIcon = defaults.object(forKey: Key.showsDockIcon.rawValue) as? Bool ?? false
         savesThumbnails = defaults.object(forKey: Key.savesThumbnails.rawValue) as? Bool ?? true
         hasCompletedOnboarding = defaults.bool(forKey: Key.hasCompletedOnboarding.rawValue)
+        checksForUpdates = defaults.object(forKey: Key.checksForUpdates.rawValue) as? Bool ?? true
+        lastUpdateCheck = defaults.object(forKey: Key.lastUpdateCheck.rawValue) as? Date
+        skippedUpdateVersion = defaults.string(forKey: Key.skippedUpdateVersion.rawValue)
     }
 
     /// The preferences the router needs, captured at the start of a translation.
@@ -99,6 +111,7 @@ public final class AppSettings {
         case overlayStyle, textScale, subtitle
         case translateShortcut, revealModifier
         case showsDockIcon, savesThumbnails, hasCompletedOnboarding
+        case checksForUpdates, lastUpdateCheck, skippedUpdateVersion
     }
 
     private func store<Value: Encodable>(_ value: Value, _ key: Key) {

@@ -2,7 +2,7 @@ import AppKit
 import GlanslateCore
 import SwiftUI
 
-/// A brief floating message for problems that happen before an overlay exists.
+/// A brief floating message, such as a problem that happens before an overlay exists.
 @MainActor
 final class ToastPresenter {
     private var panel: OverlayPanel?
@@ -10,11 +10,24 @@ final class ToastPresenter {
 
     func show(_ error: GlanslateError, near anchor: CGRect? = nil, action: (title: String, handler: @MainActor () -> Void)? = nil) {
         guard error != .cancelled else { return }
+        show(title: error.title, message: error.message, symbol: "exclamationmark.triangle.fill", tint: .orange, near: anchor, action: action)
+    }
+
+    func show(
+        title: String,
+        message: String,
+        symbol: String,
+        tint: Color,
+        near anchor: CGRect? = nil,
+        action: (title: String, handler: @MainActor () -> Void)? = nil
+    ) {
         dismiss()
 
         let view = ToastView(
-            title: error.title,
-            message: error.message,
+            title: title,
+            message: message,
+            symbol: symbol,
+            tint: tint,
             actionTitle: action?.title,
             onAction: { [weak self] in
                 action?.handler()
@@ -48,7 +61,7 @@ final class ToastPresenter {
         NSAccessibility.post(
             element: host,
             notification: .announcementRequested,
-            userInfo: [.announcement: "\(error.title). \(error.message)", .priority: NSAccessibilityPriorityLevel.high.rawValue]
+            userInfo: [.announcement: "\(title). \(message)", .priority: NSAccessibilityPriorityLevel.high.rawValue]
         )
         self.panel = panel
 
@@ -71,6 +84,8 @@ final class ToastPresenter {
 private struct ToastView: View {
     let title: String
     let message: String
+    let symbol: String
+    let tint: Color
     let actionTitle: String?
     let onAction: @MainActor () -> Void
 
@@ -78,9 +93,9 @@ private struct ToastView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            Image(systemName: symbol)
                 .font(.system(size: 17))
-                .foregroundStyle(.orange)
+                .foregroundStyle(tint)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)

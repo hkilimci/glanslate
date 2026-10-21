@@ -30,6 +30,11 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let settings = environment.settings
 
+        if let update = environment.updates?.announcedUpdate {
+            menu.addItem(item("Update to Glanslate \(update.version)…", symbol: "arrow.down.circle", action: #selector(openUpdate)))
+            menu.addItem(.separator())
+        }
+
         let translate = item("Translate Region", symbol: "text.viewfinder", action: #selector(translateRegion))
         if let combo = settings.translateShortcut, let key = Self.keyEquivalent(for: combo) {
             translate.keyEquivalent = key
@@ -57,6 +62,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
         menu.addItem(item("About Glanslate", symbol: nil, action: #selector(showAbout)))
+        if environment.updates != nil {
+            menu.addItem(item("Check for Updates…", symbol: nil, action: #selector(checkForUpdates)))
+        }
         let quit = item("Quit Glanslate", symbol: nil, action: #selector(quit))
         quit.keyEquivalent = "q"
         menu.addItem(quit)
@@ -148,6 +156,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     @objc private func openSaved() { environment.commands.openSavedTranslations() }
     @objc private func openSettings() { environment.commands.openSettings(environment.settingsSection) }
     @objc private func showAbout() { environment.commands.showAbout() }
+    @objc private func openUpdate() { environment.commands.openSettings(.about) }
+    @objc private func checkForUpdates() { environment.commands.checkForUpdates() }
     @objc private func quit() { NSApp.terminate(nil) }
 }
 
@@ -160,6 +170,9 @@ enum MainMenuBuilder {
 
         let appMenu = NSMenu(title: "Glanslate")
         appMenu.addItem(withTitle: "About Glanslate", action: #selector(AppController.aboutAction(_:)), keyEquivalent: "").target = target
+        if target.environment.updates != nil {
+            appMenu.addItem(withTitle: "Check for Updates…", action: #selector(AppController.checkForUpdatesAction(_:)), keyEquivalent: "").target = target
+        }
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Settings…", action: #selector(AppController.openSettingsAction(_:)), keyEquivalent: ",").target = target
         appMenu.addItem(.separator())

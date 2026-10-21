@@ -143,4 +143,22 @@ public enum Relauncher {
             DispatchQueue.main.async { NSApp.terminate(nil) }
         }
     }
+
+    /// Starts the copy now installed and quits only once it has launched, calling
+    /// `willQuit` first. If it can't start, calls `failed` and keeps running.
+    public static func relaunch(willQuit: @escaping @MainActor () -> Void, failed: @escaping @MainActor () -> Void) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { application, error in
+            let launched = application != nil && error == nil
+            DispatchQueue.main.async {
+                if launched {
+                    willQuit()
+                    NSApp.terminate(nil)
+                } else {
+                    failed()
+                }
+            }
+        }
+    }
 }

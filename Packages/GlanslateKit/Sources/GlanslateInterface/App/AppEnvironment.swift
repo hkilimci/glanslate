@@ -58,6 +58,8 @@ final class AppEnvironment {
     let credentials: any CredentialStoring
     /// `nil` when the on-disk store couldn't open; pinning is then unavailable until relaunch.
     let store: SavedTranslationStore?
+    /// `nil` when this build has no release feed configured.
+    let updates: UpdateController?
 
     var settingsSection: SettingsSection = .general
     /// A language pair Settings should offer to download, set from an overlay error.
@@ -79,13 +81,21 @@ final class AppEnvironment {
         var suspendShortcut: @MainActor () -> Void = {}
         var applyDockIcon: @MainActor () -> Void = {}
         var showAbout: @MainActor () -> Void = {}
+        var checkForUpdates: @MainActor () -> Void = {}
     }
 
-    init(settings: AppSettings, permissions: PermissionMonitor, credentials: any CredentialStoring, store: SavedTranslationStore?) {
+    init(
+        settings: AppSettings,
+        permissions: PermissionMonitor,
+        credentials: any CredentialStoring,
+        store: SavedTranslationStore?,
+        updates: UpdateController? = nil
+    ) {
         self.settings = settings
         self.permissions = permissions
         self.credentials = credentials
         self.store = store
+        self.updates = updates
     }
 
     func hasCredential(for provider: TranslationProvider) -> Bool {

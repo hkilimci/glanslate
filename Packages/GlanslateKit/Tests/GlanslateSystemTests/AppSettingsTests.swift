@@ -23,6 +23,9 @@ struct AppSettingsTests {
         #expect(settings.revealModifier == .option)
         #expect(settings.consentedProviders.isEmpty)
         #expect(!settings.showsDockIcon)
+        #expect(settings.checksForUpdates)
+        #expect(settings.lastUpdateCheck == nil)
+        #expect(settings.skippedUpdateVersion == nil)
     }
 
     @Test func changesPersistAcrossLaunches() {
@@ -37,6 +40,9 @@ struct AppSettingsTests {
         settings.translateShortcut = nil
         settings.revealModifier = .control
         settings.setConsent(true, for: .deepL)
+        settings.checksForUpdates = false
+        settings.lastUpdateCheck = Date(timeIntervalSince1970: 1_790_856_000)
+        settings.skippedUpdateVersion = "1.2.0"
 
         let reloaded = AppSettings(defaults: defaults)
         #expect(reloaded.targetLanguage == .japanese)
@@ -50,6 +56,9 @@ struct AppSettingsTests {
         #expect(reloaded.hasConsent(for: .deepL))
         #expect(!reloaded.hasConsent(for: .openAI))
         #expect(reloaded.hasConsent(for: .apple), "On-device translation needs no consent")
+        #expect(!reloaded.checksForUpdates)
+        #expect(reloaded.lastUpdateCheck == Date(timeIntervalSince1970: 1_790_856_000))
+        #expect(reloaded.skippedUpdateVersion == "1.2.0")
     }
 
     @Test func routingPolicyIgnoresAFallbackEqualToThePreferredProvider() {
