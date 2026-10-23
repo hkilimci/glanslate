@@ -208,6 +208,7 @@ GLANSLATE_SNAPSHOTS=/tmp/glanslate-snapshots swift test --package-path Packages/
 ## Troubleshooting
 
 - **"Screen Recording is off" after every build.** Sign with your team; see *Build and run*.
+- **"No Team Found in Archive" despite selecting a team.** Use a signing certificate such as **Apple Development** for Release instead of **Sign to Run Locally**. Select your team on the Glanslate target for Release, then create a new archive; an existing locally signed archive has no team information.
 - **"Languages not downloaded."** Choose **Download…** in the overlay message or in Settings › Translation. The system asks before downloading.
 - **The shortcut doesn't work.** Another app may use it. Settings › Shortcuts says so when that happens. Record a different shortcut.
 - **Google says the service needs setup.** Enable the Cloud Translation API and billing for the project the key belongs to.
