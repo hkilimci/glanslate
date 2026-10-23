@@ -271,7 +271,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 6A1E00000000000000000003 /* Glanslate.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = J2WJMC3K74;
 				INFOPLIST_KEY_CFBundleDisplayName = Glanslate;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -288,7 +288,7 @@
 			baseConfigurationReference = 6A1E00000000000000000003 /* Glanslate.xcconfig */;
 			buildSettings = {
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = J2WJMC3K74;
 				INFOPLIST_KEY_CFBundleDisplayName = Glanslate;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
