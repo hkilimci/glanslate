@@ -43,6 +43,8 @@ jobs:
         run: |
           xcodebuild -version
           swift --version
+      - name: Test release workflow
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -v
       - name: Build package
         run: |
           if ! swift build --build-tests --package-path Packages/GlanslateKit > package-build.log 2>&1; then

@@ -217,7 +217,15 @@ GLANSLATE_SNAPSHOTS=/tmp/glanslate-snapshots swift test --package-path Packages/
 
 ## Releasing
 
-`scripts/release.sh` archives a Release build signed with Developer ID, notarizes it when `NOTARY_PROFILE` names a `notarytool` keychain profile, and packages `build/Glanslate-<version>.dmg` and `build/Glanslate-<version>.zip`:
+`scripts/release.sh` requires a local **Developer ID Application** certificate and private key for your team, plus a saved `notarytool` keychain profile. Create the certificate in **Xcode › Settings › Apple Accounts › Manage Certificates**, then save your notarization credentials once (enter the app-specific password at the hidden prompt):
+
+```sh
+xcrun notarytool store-credentials glanslate --apple-id you@example.com --team-id ABCDE12345
+```
+
+The script archives and exports a Release build signed with your team's Developer ID certificate, notarizes and staples the app for the updater ZIP, then creates, signs, notarizes, and staples the final DMG. It validates both signatures and tickets and checks Gatekeeper before optionally publishing. Missing credentials, rejected submissions, or failed verification stop the release.
+
+Outputs are `build/Glanslate-<version>.dmg` and `build/Glanslate-<version>.zip`. Apple's submission results are saved in `build/Glanslate-app-notarization.plist` and `build/Glanslate-dmg-notarization.plist` for troubleshooting.
 
 ```sh
 GLANSLATE_DEVELOPMENT_TEAM=ABCDE12345 NOTARY_PROFILE=glanslate scripts/release.sh
