@@ -11,7 +11,7 @@ public struct AvailableUpdate: Hashable, Sendable {
     public let notes: String
     public let publishedAt: Date?
     public let releasePage: URL
-    /// The zipped app to install. `nil` when the release has none, so it can only be downloaded by hand.
+    /// The disk image to install. `nil` when the release has none, so it can only be downloaded by hand.
     public let archive: Archive?
 
     public struct Archive: Hashable, Sendable {
@@ -134,7 +134,7 @@ public enum UpdateError: Error, Hashable, Sendable {
 /// Reads the newest published release of a public GitHub repository.
 ///
 /// Drafts and pre-releases are never offered. The release's tag names its version
-/// (`v1.4.2`), and its first `.zip` asset is the app to install.
+/// (`v1.4.2`), and its first `.dmg` asset contains the app to install.
 public struct GitHubReleaseFeed: UpdateChecking {
     public let repository: String
     private let userAgent: String
@@ -188,7 +188,7 @@ public struct GitHubReleaseFeed: UpdateChecking {
         guard version > current else { return .upToDate(latest: version) }
 
         let archive = release.assets
-            .first { ($0.state ?? "uploaded") == "uploaded" && $0.name.lowercased().hasSuffix(".zip") }
+            .first { ($0.state ?? "uploaded") == "uploaded" && $0.name.lowercased().hasSuffix(".dmg") }
             .map { AvailableUpdate.Archive(url: $0.browserDownloadURL, size: $0.size, sha256: sha256(fromDigest: $0.digest)) }
         let name = release.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return .available(AvailableUpdate(

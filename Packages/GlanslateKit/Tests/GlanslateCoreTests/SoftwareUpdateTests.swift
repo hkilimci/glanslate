@@ -39,7 +39,7 @@ struct GitHubReleaseFeedTests {
         name: String? = "Glanslate 1.2",
         draft: Bool = false,
         prerelease: Bool = false,
-        assets: String = #"[{"name":"Glanslate-1.2.0.dmg","browser_download_url":"https://github.com/o/r/releases/download/v1.2.0/Glanslate-1.2.0.dmg","size":9000,"state":"uploaded"},{"name":"Glanslate-1.2.0.zip","browser_download_url":"https://github.com/o/r/releases/download/v1.2.0/Glanslate-1.2.0.zip","size":8000,"state":"uploaded","digest":"sha256:ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef0123456789"}]"#
+        assets: String = #"[{"name":"Glanslate-1.2.0.zip","browser_download_url":"https://github.com/o/r/releases/download/v1.2.0/Glanslate-1.2.0.zip","size":8000,"state":"uploaded"},{"name":"Glanslate-1.2.0.dmg","browser_download_url":"https://github.com/o/r/releases/download/v1.2.0/Glanslate-1.2.0.dmg","size":9000,"state":"uploaded","digest":"sha256:ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef0123456789"}]"#
     ) -> String {
         let nameField = name.map { #""\#($0)""# } ?? "null"
         return #"{"tag_name":"\#(tag)","name":\#(nameField),"body":"**Faster** overlays.\n","html_url":"https://github.com/o/r/releases/tag/\#(tag)","published_at":"2026-10-01T12:00:00Z","draft":\#(draft),"prerelease":\#(prerelease),"assets":\#(assets)}"#
@@ -61,7 +61,7 @@ struct GitHubReleaseFeedTests {
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
     }
 
-    @Test func offersANewerReleaseWithItsZipAndDigest() async throws {
+    @Test func offersANewerReleaseWithItsDiskImageAndDigest() async throws {
         let result = try await feed(StubTransport(status: 200, json: releaseJSON())).check(currentVersion: current)
         guard case .available(let update) = result else {
             Issue.record("Expected an update, got \(result)")
@@ -73,8 +73,8 @@ struct GitHubReleaseFeedTests {
         #expect(update.releasePage.absoluteString == "https://github.com/o/r/releases/tag/v1.2.0")
         #expect(update.publishedAt == Date(timeIntervalSince1970: 1_790_856_000))
         let archive = try #require(update.archive)
-        #expect(archive.url.lastPathComponent == "Glanslate-1.2.0.zip")
-        #expect(archive.size == 8000)
+        #expect(archive.url.lastPathComponent == "Glanslate-1.2.0.dmg")
+        #expect(archive.size == 9000)
         #expect(archive.sha256 == "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
     }
 
@@ -92,8 +92,8 @@ struct GitHubReleaseFeedTests {
         }
     }
 
-    @Test func releasesWithoutAZipCanOnlyBeDownloadedByHand() async throws {
-        let json = releaseJSON(name: nil, assets: #"[{"name":"Glanslate.dmg","browser_download_url":"https://example.com/a.dmg","size":1},{"name":"Glanslate.zip","browser_download_url":"https://example.com/a.zip","size":1,"state":"starter"}]"#)
+    @Test func releasesWithoutAnUploadedDiskImageCanOnlyBeDownloadedByHand() async throws {
+        let json = releaseJSON(name: nil, assets: #"[{"name":"Glanslate.dmg","browser_download_url":"https://example.com/a.dmg","size":1,"state":"starter"},{"name":"Glanslate.zip","browser_download_url":"https://example.com/a.zip","size":1,"state":"uploaded"}]"#)
         let result = try await feed(StubTransport(status: 200, json: json)).check(currentVersion: current)
         guard case .available(let update) = result else {
             Issue.record("Expected an update, got \(result)")
@@ -101,6 +101,16 @@ struct GitHubReleaseFeedTests {
         }
         #expect(update.archive == nil)
         #expect(update.title == "Glanslate 1.2.0")
+    }
+
+    @Test func uploadedDiskImageExtensionIsCaseInsensitive() async throws {
+        let json = releaseJSON(assets: #"[{"name":"Glanslate.DMG","browser_download_url":"https://example.com/Glanslate.DMG","size":1}]"#)
+        let result = try await feed(StubTransport(status: 200, json: json)).check(currentVersion: current)
+        guard case .available(let update) = result else {
+            Issue.record("Expected an update, got \(result)")
+            return
+        }
+        #expect(update.archive?.url.lastPathComponent == "Glanslate.DMG")
     }
 
     @Test func digestsMustBeSHA256() {

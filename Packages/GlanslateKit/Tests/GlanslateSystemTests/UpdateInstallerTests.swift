@@ -8,6 +8,7 @@ struct UpdateInstallerTests {
     private static let identifier = "app.glanslate.UpdateTests"
     /// Satisfied by any signature with the test identifier, including an ad hoc one.
     private static let anySignature = "identifier \"\(identifier)\""
+    private static let anyDiskImageSignature = "identifier \"\(identifier).dmg\""
 
     private let root: URL
     private let installed: URL
@@ -59,10 +60,10 @@ struct UpdateInstallerTests {
 
     @Test func installsAGenuineUpdateAndKeepsThePreviousCopyUntilFinished() async throws {
         defer { cleanUp() }
-        let zip = try makeArchive(version: "1.2.0", signed: true, minimumSystem: "26.0")
-        var installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"])
+        let image = try makeDiskImage(version: "1.2.0", signed: true, minimumSystem: "26.0")
+        var installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
         installer.systemVersion = AppVersion("26.0")!
-        let result = try await installer.install(update(zip, version: "1.2.0", sha256: UpdateInstaller.sha256(of: zip))) { _ in }
+        let result = try await installer.install(update(image, version: "1.2.0", sha256: UpdateInstaller.sha256(of: image))) { _ in }
 
         #expect(installedVersion() == "1.2.0")
         #expect(UpdateInstaller.version(ofAppAt: result.previousCopy) == AppVersion("1.0.0"))
@@ -73,9 +74,9 @@ struct UpdateInstallerTests {
 
     @Test func revertingPutsThePreviousCopyBack() async throws {
         defer { cleanUp() }
-        let zip = try makeArchive(version: "1.2.0", signed: true)
-        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"])
-        let result = try await installer.install(update(zip, version: "1.2.0")) { _ in }
+        let image = try makeDiskImage(version: "1.2.0", signed: true)
+        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
+        let result = try await installer.install(update(image, version: "1.2.0")) { _ in }
         #expect(installedVersion() == "1.2.0")
 
         try installer.revert(result)
@@ -86,22 +87,22 @@ struct UpdateInstallerTests {
 
     @Test func refusesAnUpdateThatNeedsANewerMacOS() async throws {
         defer { cleanUp() }
-        let zip = try makeArchive(version: "1.2.0", signed: true, minimumSystem: "27.0")
-        var installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"])
+        let image = try makeDiskImage(version: "1.2.0", signed: true, minimumSystem: "27.0")
+        var installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
         installer.systemVersion = AppVersion("26.4.1")!
         await #expect(throws: UpdateError.incompatible(minimumSystem: "27.0")) {
-            _ = try await installer.install(update(zip, version: "1.2.0")) { _ in }
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
         }
         #expect(installedVersion() == "1.0.0")
     }
 
     @Test func refusesAnUpdateBuiltForAnotherProcessor() async throws {
         defer { cleanUp() }
-        let zip = try makeArchive(version: "1.2.0", signed: true)
-        var installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"])
+        let image = try makeDiskImage(version: "1.2.0", signed: true)
+        var installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
         installer.architecture = 18 // CPU_TYPE_POWERPC, which no current Mac executable contains
         await #expect(throws: UpdateError.incompatible(minimumSystem: nil)) {
-            _ = try await installer.install(update(zip, version: "1.2.0")) { _ in }
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
         }
         #expect(installedVersion() == "1.0.0")
     }
@@ -110,10 +111,10 @@ struct UpdateInstallerTests {
         defer { cleanUp() }
         try FileManager.default.removeItem(at: installed)
         try Self.makeApp(at: installed, version: "1.3.0")
-        let zip = try makeArchive(version: "1.2.0", signed: true)
-        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"])
+        let image = try makeDiskImage(version: "1.2.0", signed: true)
+        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
         await #expect(throws: UpdateError.newerVersionInstalled) {
-            _ = try await installer.install(update(zip, version: "1.2.0")) { _ in }
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
         }
         #expect(installedVersion() == "1.3.0")
     }
@@ -131,90 +132,180 @@ struct UpdateInstallerTests {
 
     @Test func refusesADamagedDownload() async throws {
         defer { cleanUp() }
-        let zip = try makeArchive(version: "1.2.0", signed: true)
-        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"])
+        let image = try makeDiskImage(version: "1.2.0", signed: true)
+        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
         await #expect(throws: UpdateError.checksumMismatch) {
-            _ = try await installer.install(update(zip, version: "1.2.0", sha256: String(repeating: "0", count: 64))) { _ in }
+            _ = try await installer.install(update(image, version: "1.2.0", sha256: String(repeating: "0", count: 64))) { _ in }
         }
         #expect(installedVersion() == "1.0.0")
     }
 
     @Test func refusesAnUnsignedApp() async throws {
         defer { cleanUp() }
-        let zip = try makeArchive(version: "1.2.0", signed: false)
-        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"])
+        let image = try makeDiskImage(version: "1.2.0", signed: false)
+        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
         await #expect(throws: UpdateError.untrustedSignature) {
-            _ = try await installer.install(update(zip, version: "1.2.0")) { _ in }
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
         }
         #expect(installedVersion() == "1.0.0")
     }
 
     @Test func refusesAnAppSignedBySomeoneElse() async throws {
         defer { cleanUp() }
-        let zip = try makeArchive(version: "1.2.0", signed: true)
+        let image = try makeDiskImage(version: "1.2.0", signed: true)
         let developerID = try #require(UpdateInstaller.developerIDRequirement(identifier: Self.identifier, team: "ABCDE12345"))
-        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: developerID, allowedSchemes: ["file"])
+        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: developerID, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
         await #expect(throws: UpdateError.untrustedSignature) {
-            _ = try await installer.install(update(zip, version: "1.2.0")) { _ in }
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
         }
         #expect(installedVersion() == "1.0.0")
     }
 
     @Test func refusesAVersionOtherThanTheReleaseNames() async throws {
         defer { cleanUp() }
-        let zip = try makeArchive(version: "0.9.0", signed: true)
-        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"])
+        let image = try makeDiskImage(version: "0.9.0", signed: true)
+        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
         await #expect(throws: UpdateError.unexpectedContents) {
-            _ = try await installer.install(update(zip, version: "1.2.0")) { _ in }
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
         }
         #expect(installedVersion() == "1.0.0")
     }
 
-    @Test func refusesArchivesWithoutAnApp() async throws {
+    @Test func refusesDiskImagesWithoutAnApp() async throws {
         defer { cleanUp() }
         let source = root.appendingPathComponent("Notes", isDirectory: true)
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
         try Data("hello".utf8).write(to: source.appendingPathComponent("README.txt"))
-        let zip = root.appendingPathComponent("NoApp.zip")
-        try Self.run("/usr/bin/ditto", ["-c", "-k", "--keepParent", source.path, zip.path])
+        let image = try makeImage(from: source)
+        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
+        await #expect(throws: UpdateError.unexpectedContents) {
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
+        }
+        #expect(installedVersion() == "1.0.0")
+    }
+
+    @Test(arguments: [false, true])
+    func refusesUnsignedOrDifferentlySignedDiskImages(signed: Bool) async throws {
+        defer { cleanUp() }
+        let source = root.appendingPathComponent("Untrusted", isDirectory: true)
+        try Self.makeApp(at: source.appendingPathComponent("Glanslate.app"), version: "1.2.0")
+        try Self.run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", Self.identifier, source.appendingPathComponent("Glanslate.app").path])
+        let image = try makeImage(from: source, signed: signed, identifier: "another.developer.dmg")
+        let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"], diskImageRequirement: Self.anyDiskImageSignature)
+        await #expect(throws: UpdateError.untrustedSignature) {
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
+        }
+        #expect(installedVersion() == "1.0.0")
+    }
+
+    @Test func copiesOnlyTheAppAndEjectsTheImage() async throws {
+        defer { cleanUp() }
+        let source = root.appendingPathComponent("WithLinks", isDirectory: true)
+        let app = source.appendingPathComponent("Glanslate.app", isDirectory: true)
+        try Self.makeApp(at: app, version: "1.2.0")
+        let resources = app.appendingPathComponent("Contents/Resources", isDirectory: true)
+        try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+        try Data("resource".utf8).write(to: resources.appendingPathComponent("Original.txt"))
+        try FileManager.default.createSymbolicLink(atPath: resources.appendingPathComponent("Link.txt").path, withDestinationPath: "Original.txt")
+        try Self.run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", Self.identifier, app.path])
+        try FileManager.default.createSymbolicLink(atPath: source.appendingPathComponent("Applications").path, withDestinationPath: "/Applications")
+        let image = try makeImage(from: source)
+        let destination = root.appendingPathComponent("Copied", isDirectory: true)
+
+        let copied = try await UpdateInstaller.copyApp(fromDiskImage: image, into: destination)
+
+        try UpdateInstaller.verifySignature(of: copied, requirement: Self.anySignature)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: copied.appendingPathComponent("Contents/Resources/Link.txt").path) == "Original.txt")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: destination.path) == ["Glanslate.app"])
+        #expect(try !Self.isMounted(image))
+    }
+
+    @Test(arguments: [false, true])
+    func rejectsAmbiguousOrSymlinkedAppsAndEjectsTheImage(symlink: Bool) async throws {
+        defer { cleanUp() }
+        let source = root.appendingPathComponent("InvalidContents", isDirectory: true)
+        try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+        if symlink {
+            try FileManager.default.createSymbolicLink(atPath: source.appendingPathComponent("Glanslate.app").path, withDestinationPath: installed.path)
+        } else {
+            try Self.makeApp(at: source.appendingPathComponent("First.app"), version: "1.2.0")
+            try Self.makeApp(at: source.appendingPathComponent("Second.app"), version: "1.2.0")
+        }
+        let image = try makeImage(from: source)
+        let destination = root.appendingPathComponent("Rejected", isDirectory: true)
+
+        await #expect(throws: UpdateError.unexpectedContents) {
+            _ = try await UpdateInstaller.copyApp(fromDiskImage: image, into: destination)
+        }
+
+        #expect(try !Self.isMounted(image))
+        #expect(installedVersion() == "1.0.0")
+    }
+
+    @Test func aCorruptDiskImageDoesNotChangeTheInstalledApp() async throws {
+        defer { cleanUp() }
+        let image = root.appendingPathComponent("Corrupt.dmg")
+        try Data("not a disk image".utf8).write(to: image)
+        // Omit the container requirement to exercise attach failure and cleanup.
         let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature, allowedSchemes: ["file"])
         await #expect(throws: UpdateError.unexpectedContents) {
-            _ = try await installer.install(update(zip, version: "1.2.0")) { _ in }
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
         }
+        #expect(installedVersion() == "1.0.0")
+    }
+
+    @Test func cancellationDoesNotMountTheImage() async throws {
+        defer { cleanUp() }
+        let image = try makeDiskImage(version: "1.2.0", signed: true)
+        let destination = root.appendingPathComponent("Cancelled", isDirectory: true)
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await UpdateInstaller.copyApp(fromDiskImage: image, into: destination)
+        }
+        await #expect(throws: CancellationError.self) { _ = try await task.value }
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+        #expect(installedVersion() == "1.0.0")
     }
 
     @Test func downloadsOnlyOverHTTPS() async throws {
         defer { cleanUp() }
-        let zip = try makeArchive(version: "1.2.0", signed: true)
+        let image = try makeDiskImage(version: "1.2.0", signed: true)
         let installer = UpdateInstaller(bundleURL: installed, bundleIdentifier: Self.identifier, requirement: Self.anySignature)
         await #expect(throws: UpdateError.unexpectedContents) {
-            _ = try await installer.install(update(zip, version: "1.2.0")) { _ in }
+            _ = try await installer.install(update(image, version: "1.2.0")) { _ in }
         }
         #expect(installedVersion() == "1.0.0")
     }
 
     // MARK: Fixtures
 
-    private func update(_ zip: URL, version: String, sha256: String? = nil) -> AvailableUpdate {
+    private func update(_ image: URL, version: String, sha256: String? = nil) -> AvailableUpdate {
         AvailableUpdate(
             version: AppVersion(version)!,
             title: "Glanslate \(version)",
             notes: "",
             publishedAt: nil,
             releasePage: URL(string: "https://example.com/release")!,
-            archive: .init(url: zip, size: 0, sha256: sha256)
+            archive: .init(url: image, size: 0, sha256: sha256)
         )
     }
 
-    private func makeArchive(version: String, signed: Bool, minimumSystem: String? = nil) throws -> URL {
+    private func makeDiskImage(version: String, signed: Bool, minimumSystem: String? = nil) throws -> URL {
         let app = root.appendingPathComponent("Build-\(UUID().uuidString)/Glanslate.app", isDirectory: true)
         try Self.makeApp(at: app, version: version, minimumSystem: minimumSystem)
         if signed {
             try Self.run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", Self.identifier, app.path])
         }
-        let zip = root.appendingPathComponent("Glanslate-\(version)-\(UUID().uuidString).zip")
-        try Self.run("/usr/bin/ditto", ["-c", "-k", "--keepParent", app.path, zip.path])
-        return zip
+        return try makeImage(from: app.deletingLastPathComponent())
+    }
+
+    private func makeImage(from directory: URL, signed: Bool = true, identifier: String? = nil) throws -> URL {
+        let image = root.appendingPathComponent("Glanslate-\(UUID().uuidString).dmg")
+        try Self.run("/usr/bin/hdiutil", ["create", "-volname", "Glanslate Update Tests", "-srcfolder", directory.path, "-ov", "-format", "UDZO", image.path])
+        if signed {
+            try Self.run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", identifier ?? Self.identifier + ".dmg", image.path])
+        }
+        return image
     }
 
     private func installedVersion() -> String? {
@@ -224,6 +315,26 @@ struct UpdateInstallerTests {
 
     private func cleanUp() {
         try? FileManager.default.removeItem(at: root)
+    }
+
+    private static func isMounted(_ image: URL) throws -> Bool {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+        process.arguments = ["info", "-plist"]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        let info = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        let images = try #require(info?["images"] as? [[String: Any]])
+        #expect(process.terminationStatus == 0)
+        return images.contains { entry in
+            guard let path = entry["image-path"] as? String else { return false }
+            return URL(fileURLWithPath: path).resolvingSymlinksInPath() == image.resolvingSymlinksInPath()
+        }
     }
 
     /// A minimal bundle whose executable is a real Mach-O, so it can be code signed.
@@ -248,6 +359,7 @@ struct UpdateInstallerTests {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: tool)
         process.arguments = arguments
+        process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()

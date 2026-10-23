@@ -1,7 +1,7 @@
 #!/bin/bash
-# Archives, exports with Developer ID, and notarizes Glanslate, then packages a
-# signed, notarized, stapled disk image and a zip for the in-app updater. Optionally
-# publishes both as a GitHub release, which running copies then offer as an update.
+# Archives and exports Glanslate with Developer ID, then signs, notarizes, and
+# staples a disk image used for both manual installation and in-app updates.
+# Optionally publishes that DMG as a GitHub release.
 #
 # Requirements:
 #   GLANSLATE_DEVELOPMENT_TEAM  your Apple Developer Team ID
@@ -10,6 +10,7 @@
 #   A valid Developer ID Application certificate and private key for the team
 #   must be installed in the keychain.
 # Optional:
+#   DMG_OUTPUT                  output path ending in .dmg (defaults to build/Glanslate-<version>.dmg)
 #   PUBLISH=1                   create the GitHub release v<version> with `gh`.
 #                               Requires a clean working tree and
 #                               HEAD pushed to the repository, so the tag names
@@ -34,6 +35,13 @@ if [[ ! -d "${PROJECT_ROOT}/Glanslate.xcodeproj" ]]; then
 fi
 
 fail() { echo "$1" >&2; exit 1; }
+
+if [[ -n "${DMG_OUTPUT:-}" ]]; then
+    case "${DMG_OUTPUT}" in
+        *.[dD][mM][gG]) ;;
+        *) fail "DMG_OUTPUT must end in .dmg so the updater can find it." ;;
+    esac
+fi
 
 # Choose a local certificate for this team, even if other teams also have
 # Developer ID certificates installed. codesign and xcodebuild accept its SHA-1.
@@ -102,24 +110,20 @@ xcodebuild -exportArchive \
     -quiet
 
 echo "==> Notarizing app"
-SUBMISSION_ZIP="${BUILD_DIR}/Glanslate-notarization.zip"
-ditto -c -k --keepParent "${APP_PATH}" "${SUBMISSION_ZIP}"
-notarize "${SUBMISSION_ZIP}" "${BUILD_DIR}/Glanslate-app-notarization.plist"
+VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${APP_PATH}/Contents/Info.plist")"
+BUNDLE_IDENTIFIER="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "${APP_PATH}/Contents/Info.plist")"
+DMG_OUTPUT="${DMG_OUTPUT:-${BUILD_DIR}/Glanslate-${VERSION}.dmg}"
+# Use a temporary DMG to obtain the app's ticket before packaging it. The ticket
+# then stays with the app when either Finder or the updater copies it out.
+SUBMISSION_DMG="${BUILD_DIR}/Glanslate-app-notarization.dmg"
+"${SCRIPT_DIR}/make-dmg.sh" "${APP_PATH}" "${SUBMISSION_DMG}"
+codesign --sign "${SIGNING_IDENTITY}" --timestamp --identifier "${BUNDLE_IDENTIFIER}.notarization" "${SUBMISSION_DMG}"
+notarize "${SUBMISSION_DMG}" "${BUILD_DIR}/Glanslate-app-notarization.plist"
 xcrun stapler staple "${APP_PATH}"
 xcrun stapler validate "${APP_PATH}"
 codesign --verify --deep --strict "${APP_PATH}"
 spctl --assess --verbose=2 --type execute "${APP_PATH}"
-rm -f "${SUBMISSION_ZIP}"
-
-VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${APP_PATH}/Contents/Info.plist")"
-BUNDLE_IDENTIFIER="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "${APP_PATH}/Contents/Info.plist")"
-DMG_OUTPUT="${DMG_OUTPUT:-${BUILD_DIR}/Glanslate-${VERSION}.dmg}"
-ZIP_OUTPUT="${BUILD_DIR}/Glanslate-${VERSION}.zip"
-
-echo "==> Creating update archive"
-# Zipped after stapling, so the notarization ticket travels with the app.
-rm -f "${ZIP_OUTPUT}"
-ditto -c -k --sequesterRsrc --keepParent "${APP_PATH}" "${ZIP_OUTPUT}"
+rm -f "${SUBMISSION_DMG}"
 
 echo "==> Creating disk image"
 "${SCRIPT_DIR}/make-dmg.sh" "${APP_PATH}" "${DMG_OUTPUT}"
@@ -144,11 +148,11 @@ if [[ "${PUBLISH:-}" == "1" ]]; then
     echo "==> Publishing v${VERSION} to ${REPOSITORY}"
     NOTES_ARGS=(--generate-notes)
     if [[ -n "${RELEASE_NOTES:-}" ]]; then NOTES_ARGS=(--notes-file "${RELEASE_NOTES}"); fi
-    gh release create "v${VERSION}" "${ZIP_OUTPUT}" "${DMG_OUTPUT}" \
+    gh release create "v${VERSION}" "${DMG_OUTPUT}" \
         --repo "${REPOSITORY}" \
         --target "${COMMIT}" \
         --title "Glanslate ${VERSION}" \
         "${NOTES_ARGS[@]}"
 fi
 
-echo "Done: ${DMG_OUTPUT}, ${ZIP_OUTPUT}"
+echo "Done: ${DMG_OUTPUT}"

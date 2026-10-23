@@ -53,6 +53,8 @@ public struct UpdateInstaller: UpdateInstalling {
     let bundleIdentifier: String
     /// The code requirement a download must satisfy, or `nil` when the running copy isn't Developer ID signed.
     let requirement: String?
+    /// The release container must be signed by the same team, with the app's identifier plus `.dmg`.
+    let diskImageRequirement: String?
     var allowedSchemes: Set<String> = ["https"]
     var systemVersion = UpdateInstaller.currentSystemVersion
     /// An `NSBundleExecutableArchitecture…` value the new executable must contain.
@@ -62,12 +64,14 @@ public struct UpdateInstaller: UpdateInstalling {
         bundleURL = bundle.bundleURL
         bundleIdentifier = bundle.bundleIdentifier ?? ""
         requirement = Self.developerIDRequirement(forAppAt: bundle.bundleURL)
+        diskImageRequirement = Self.developerIDRequirement(forAppAt: bundle.bundleURL, identifierSuffix: ".dmg")
     }
 
-    init(bundleURL: URL, bundleIdentifier: String, requirement: String?, allowedSchemes: Set<String> = ["https"]) {
+    init(bundleURL: URL, bundleIdentifier: String, requirement: String?, allowedSchemes: Set<String> = ["https"], diskImageRequirement: String? = nil) {
         self.bundleURL = bundleURL
         self.bundleIdentifier = bundleIdentifier
         self.requirement = requirement
+        self.diskImageRequirement = diskImageRequirement
         self.allowedSchemes = allowedSchemes
     }
 
@@ -94,17 +98,18 @@ public struct UpdateInstaller: UpdateInstalling {
         var keepsStaging = false
         defer { if !keepsStaging { try? files.removeItem(at: staging) } }
 
-        let zip = staging.appendingPathComponent("Update.zip")
-        try await Self.download(archive.url, to: zip, progress: progress)
+        let image = staging.appendingPathComponent("Update.dmg")
+        try await Self.download(archive.url, to: image, progress: progress)
         try Task.checkCancellation()
 
         if let expected = archive.sha256 {
-            guard (try? Self.sha256(of: zip)) == expected else { throw UpdateError.checksumMismatch }
+            guard (try? Self.sha256(of: image)) == expected else { throw UpdateError.checksumMismatch }
         }
 
+        // Validate the container before handing its filesystem to the OS.
+        if let diskImageRequirement { try Self.verifySignature(of: image, requirement: diskImageRequirement) }
         let extracted = staging.appendingPathComponent("Extracted", isDirectory: true)
-        try await Self.unzip(zip, into: extracted)
-        let app = try Self.singleApp(in: extracted)
+        let app = try await Self.copyApp(fromDiskImage: image, into: extracted)
         try verify(app, version: update.version, requirement: requirement)
         try Task.checkCancellation()
 
@@ -143,10 +148,7 @@ public struct UpdateInstaller: UpdateInstalling {
               AppVersion(short) == version
         else { throw UpdateError.unexpectedContents }
 
-        var code: SecStaticCode?
-        guard SecStaticCodeCreateWithPath(app as CFURL, [], &code) == errSecSuccess, let code,
-              Self.satisfies(code, requirement, flags: SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode))
-        else { throw UpdateError.untrustedSignature }
+        try Self.verifySignature(of: app, requirement: requirement)
 
         // Genuine but unable to run here: installing it would leave nothing that opens.
         if let minimum = info["LSMinimumSystemVersion"] as? String {
@@ -216,7 +218,7 @@ public struct UpdateInstaller: UpdateInstalling {
     /// A Developer ID Application signature from the running copy's team, for its
     /// signing identifier. `nil` when the running copy doesn't meet that itself,
     /// such as a locally signed development build.
-    static func developerIDRequirement(forAppAt url: URL) -> String? {
+    static func developerIDRequirement(forAppAt url: URL, identifierSuffix: String = "") -> String? {
         var code: SecStaticCode?
         var information: CFDictionary?
         guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess, let code,
@@ -227,7 +229,8 @@ public struct UpdateInstaller: UpdateInstalling {
               let requirement = developerIDRequirement(identifier: identifier, team: team)
         else { return nil }
         // Resources were checked when the app launched; only the certificate chain matters here.
-        return satisfies(code, requirement, flags: SecCSFlags(rawValue: kSecCSDoNotValidateResources)) ? requirement : nil
+        guard satisfies(code, requirement, flags: SecCSFlags(rawValue: kSecCSDoNotValidateResources)) else { return nil }
+        return developerIDRequirement(identifier: identifier + identifierSuffix, team: team)
     }
 
     static func developerIDRequirement(identifier: String, team: String) -> String? {
@@ -243,6 +246,13 @@ public struct UpdateInstaller: UpdateInstalling {
         var requirement: SecRequirement?
         guard SecRequirementCreateWithString(requirementText as CFString, [], &requirement) == errSecSuccess, let requirement else { return false }
         return SecStaticCodeCheckValidity(code, flags, requirement) == errSecSuccess
+    }
+
+    static func verifySignature(of url: URL, requirement: String) throws {
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess, let code,
+              satisfies(code, requirement, flags: SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode))
+        else { throw UpdateError.untrustedSignature }
     }
 
     /// Whether the app can be swapped in place: not on a read-only volume (a disk
@@ -266,12 +276,50 @@ public struct UpdateInstaller: UpdateInstalling {
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
-    /// `ditto` keeps the signature, extended attributes, and symlinks inside the bundle intact.
-    static func unzip(_ archive: URL, into directory: URL) async throws {
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    /// Copy only the app from a private, read-only mount. `ditto` preserves its
+    /// signature, notarization ticket, extended attributes, and internal symlinks.
+    /// The mounted app is never executed, and the image is ejected before installation.
+    static func copyApp(fromDiskImage image: URL, into directory: URL) async throws -> URL {
+        try Task.checkCancellation()
+        let files = FileManager.default
+        // macOS can deny access to volumes mounted inside an item replacement
+        // directory (TemporaryItems). Mount separately; keep the copied app on
+        // the installed app's volume so the eventual swap is still atomic.
+        let mount = files.temporaryDirectory.appendingPathComponent("glanslate-update-mount-\(UUID().uuidString)", isDirectory: true)
+        try files.createDirectory(at: directory, withIntermediateDirectories: true)
+        try files.createDirectory(at: mount, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        do {
+            try await runTool("/usr/bin/hdiutil", ["attach", image.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path, "-quiet"])
+            try Task.checkCancellation()
+            let source = try singleApp(in: mount)
+            let app = directory.appendingPathComponent(source.lastPathComponent, isDirectory: true)
+            try await runTool("/usr/bin/ditto", [source.path, app.path])
+            try Task.checkCancellation()
+            try await detachDiskImage(at: mount)
+            try? files.removeItem(at: mount)
+            return app
+        } catch {
+            // Also try after a failed attach, which may have partially mounted.
+            // Cleanup must finish even if this task was cancelled.
+            try? await detachDiskImage(at: mount)
+            try? files.removeItem(at: mount)
+            throw error
+        }
+    }
+
+    private static func detachDiskImage(at mount: URL) async throws {
+        do {
+            try await runTool("/usr/bin/hdiutil", ["detach", mount.path, "-quiet"])
+        } catch {
+            try await runTool("/usr/bin/hdiutil", ["detach", mount.path, "-force", "-quiet"])
+        }
+    }
+
+    private static func runTool(_ executable: String, _ arguments: [String]) async throws {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        process.arguments = ["-x", "-k", archive.path, directory.path]
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         let status: Int32 = try await withCheckedThrowingContinuation { continuation in

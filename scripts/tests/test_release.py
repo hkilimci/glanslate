@@ -34,7 +34,7 @@ elif tool == 'xcrun':
         if os.environ.get('BAD_CREDENTIALS'):
             sys.exit(1)
     elif args[:2] == ['notarytool', 'submit']:
-        kind = 'dmg' if args[2].endswith('.dmg') else 'app'
+        kind = 'app' if Path(args[2]).name == 'Glanslate-app-notarization.dmg' else 'dmg'
         status = 'Invalid' if os.environ.get('REJECT_ARTIFACT') == kind else 'Accepted'
         sys.stdout.buffer.write(plistlib.dumps({'status': status, 'id': 'test-' + kind}))
     elif args[:2] == ['stapler', 'staple'] and args[2].endswith('.dmg'):
@@ -124,23 +124,26 @@ class ReleaseTests(unittest.TestCase):
         result = self.release()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         app_staple = self.matching('xcrun', ('stapler', 'staple'), '.app')[0]
-        update_zip = next(i for i, e in enumerate(self.events)
-                          if e['tool'] == 'ditto' and '--sequesterRsrc' in e['args'])
-        dmg_create = self.matching('hdiutil', ('create',))[0]
-        dmg_sign = self.matching('codesign', ('--sign',))[0]
-        dmg_submit = next(i for i, e in enumerate(self.events)
-                          if e['tool'] == 'xcrun' and e['args'][:2] == ['notarytool', 'submit']
-                          and e['args'][2].endswith('.dmg'))
+        app_create, dmg_create = self.matching('hdiutil', ('create',))
+        app_sign, dmg_sign = self.matching('codesign', ('--sign',))
+        app_submit, dmg_submit = self.matching('xcrun', ('notarytool', 'submit'))
         dmg_staple = self.matching('xcrun', ('stapler', 'staple'), '.dmg')[0]
         dmg_validate = self.matching('xcrun', ('stapler', 'validate'), '.dmg')[0]
         dmg_verify = self.matching('codesign', ('--verify',), '.dmg')[0]
         gatekeeper = self.matching('spctl', suffix='.dmg')[0]
         publish = self.matching('gh', ('release', 'create'))[0]
-        order = [app_staple, update_zip, dmg_create, dmg_sign, dmg_submit,
+        order = [app_create, app_sign, app_submit, app_staple, dmg_create, dmg_sign, dmg_submit,
                  dmg_staple, dmg_validate, dmg_verify, gatekeeper, publish]
         self.assertEqual(order, sorted(order))
         self.assertEqual(self.events[dmg_sign]['args'][1], 'A' * 40)
         self.assertIn('--timestamp', self.events[dmg_sign]['args'])
+        self.assertIn('com.azrapps.glanslate.dmg', self.events[dmg_sign]['args'])
+        self.assertFalse(self.matching('ditto'))
+        self.assertFalse(any(arg.lower().endswith('.zip') for event in self.events for arg in event['args']))
+        self.assertFalse((self.root / 'build/Glanslate-app-notarization.dmg').exists())
+        self.assertTrue((self.root / 'build/Glanslate-1.0.0.dmg').exists())
+        assets = [arg for arg in self.events[publish]['args'] if arg.endswith(('.dmg', '.zip'))]
+        self.assertEqual(assets, [str(self.root / 'build/Glanslate-1.0.0.dmg')])
         archive = next(e for e in self.events if e['tool'] == 'xcodebuild' and 'archive' in e['args'])
         self.assertIn('CODE_SIGN_IDENTITY=' + 'A' * 40, archive['args'])
         for kind in ('app', 'dmg'):
@@ -151,6 +154,20 @@ class ReleaseTests(unittest.TestCase):
         self.env.pop('NOTARY_PROFILE')
         self.assert_no_publish(self.release(PUBLISH='0'))
         self.assertFalse(self.events)
+
+    def test_non_dmg_output_stops_before_build(self):
+        result = self.release(DMG_OUTPUT=str(self.root / 'Glanslate.zip'))
+        self.assert_no_publish(result)
+        self.assertIn('DMG_OUTPUT must end in .dmg', result.stderr)
+        self.assertFalse(self.events)
+
+    def test_custom_dmg_name_is_the_only_published_asset(self):
+        output = str(self.root / 'custom release.dmg')
+        result = self.release(DMG_OUTPUT=output)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        publish = self.events[self.matching('gh', ('release', 'create'))[0]]
+        self.assertEqual([arg for arg in publish['args'] if arg.endswith('.dmg')], [output])
+        self.assertTrue(Path(output).exists())
 
     def test_packaging_without_publishing_still_notarizes_dmg(self):
         result = self.release(PUBLISH='0')
@@ -167,11 +184,12 @@ class ReleaseTests(unittest.TestCase):
         self.assert_no_publish(self.release(BAD_CREDENTIALS='1'))
         self.assertFalse(self.matching('xcodebuild'))
 
-    def test_rejected_app_stops_before_packaging(self):
+    def test_rejected_app_stops_before_final_packaging(self):
         result = self.release(REJECT_ARTIFACT='app')
         self.assert_no_publish(result)
         self.assertIn('was Invalid', result.stderr)
-        self.assertFalse(self.matching('hdiutil'))
+        self.assertEqual(len(self.matching('hdiutil')), 1)
+        self.assertFalse(self.matching('xcrun', ('stapler', 'staple')))
 
     def test_rejected_dmg_is_not_stapled_or_published(self):
         result = self.release(REJECT_ARTIFACT='dmg')

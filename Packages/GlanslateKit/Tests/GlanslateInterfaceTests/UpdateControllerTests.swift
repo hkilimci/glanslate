@@ -73,7 +73,7 @@ extension AvailableUpdate {
             notes: "- **Faster** overlays on large displays\n- Subtitle style keeps its border in dark mode\n- Fixes for right-to-left text",
             publishedAt: Date(timeIntervalSince1970: 1_790_856_000),
             releasePage: URL(string: "https://github.com/hkilimci/glanslate/releases/tag/v\(version)")!,
-            archive: .init(url: URL(string: "https://github.com/hkilimci/glanslate/releases/download/v\(version)/Glanslate-\(version).zip")!, size: 9_000_000, sha256: nil)
+            archive: .init(url: URL(string: "https://github.com/hkilimci/glanslate/releases/download/v\(version)/Glanslate-\(version).dmg")!, size: 9_000_000, sha256: nil)
         )
     }
 }
