@@ -6,6 +6,20 @@ build/
 *.xcworkspace/xcuserdata/
 Configs/Local.xcconfig
 
+# Local credentials and signing identities
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.p12
+*.pfx
+*.p8
+*.key
+*.pem
+*.developerprofile
+*.keychain
+*.keychain-db
+
 # Swift Package Manager
 .build/
 .swiftpm/

@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -21,6 +24,8 @@ jobs:
     container: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Test GlanslateCore
         run: swift test --package-path Packages/GlanslateKit
 
@@ -28,10 +33,12 @@ jobs:
     name: Build and test (macOS 26)
     runs-on: macos-26
     timeout-minutes: 40
-    permissions:
-      contents: write
+    outputs:
+      snapshot-outcome: ${{ steps.snapshots.outcome }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Show toolchain
         run: |
           xcodebuild -version
@@ -61,30 +68,6 @@ jobs:
           name: interface-snapshots
           path: snapshots
           retention-days: 14
-      - name: Commit snapshots
-        # Opt-in: include [snapshots] in a commit message to refresh Docs/Screenshots.
-        # Only a successful render replaces the committed images; the render step's
-        # continue-on-error would otherwise let a failed or timed-out run delete them.
-        if: >-
-          github.event_name == 'push'
-          && contains(github.event.head_commit.message, '[snapshots]')
-          && steps.snapshots.outcome == 'success'
-        run: |
-          shopt -s nullglob
-          rendered=(snapshots/*.png)
-          if (( ${#rendered[@]} == 0 )); then
-            echo "No snapshots were rendered; keeping Docs/Screenshots."
-            exit 0
-          fi
-          rm -rf Docs/Screenshots && mkdir -p Docs/Screenshots
-          cp "${rendered[@]}" Docs/Screenshots/
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Docs/Screenshots
-          if ! git diff --cached --quiet; then
-            git commit -m "Update interface snapshots [skip ci]"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
       - name: Build app
         if: hashFiles('Glanslate.xcodeproj/project.pbxproj') != ''
         run: |
@@ -107,3 +90,41 @@ jobs:
             exit 1
           fi
           grep -E "Test run with|Executed" app-test.log | tail -5
+
+  commit-snapshots:
+    name: Commit interface snapshots
+    needs: [core-linux, macos]
+    # Only trusted pushes can receive a write token. Pull-request code is built
+    # and tested in the read-only jobs above, never in this job.
+    if: >-
+      github.event_name == 'push'
+      && contains(github.event.head_commit.message, '[snapshots]')
+      && needs.macos.outputs.snapshot-outcome == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download snapshots from this workflow run
+        uses: actions/download-artifact@v4
+        with:
+          name: interface-snapshots
+          path: snapshots
+      - name: Commit snapshots
+        run: |
+          shopt -s nullglob
+          rendered=(snapshots/*.png)
+          if (( ${#rendered[@]} == 0 )); then
+            echo "No snapshots were rendered; keeping Docs/Screenshots."
+            exit 0
+          fi
+          rm -rf Docs/Screenshots && mkdir -p Docs/Screenshots
+          cp "${rendered[@]}" Docs/Screenshots/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Docs/Screenshots
+          if ! git diff --cached --quiet; then
+            git commit -m "Update interface snapshots [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
